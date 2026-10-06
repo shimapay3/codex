@@ -1,0 +1,54 @@
+name: sky-ledger
+
+services:
+  # Giữ một kết nối tới nguồn dữ liệu gốc và đẩy mọi thay đổi cho client qua SSE.
+  api:
+    image: node:22-alpine
+    working_dir: /app/api
+    command: ["sh", "-ec", "npm install --no-audit --no-fund --prefer-offline && exec npm run dev"]
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    environment:
+      NODE_ENV: development
+      PORT: 8000
+    volumes:
+      - ./api:/app/api
+      - api_node_modules:/app/api/node_modules
+    restart: on-failure
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -q -T 3 -O /dev/null http://127.0.0.1:8000/api/healthz || (echo 'api: khong phan hoi /api/healthz'; exit 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # Vite dev server: giao diện + proxy /api -> api (một origin duy nhất, cổng 3000).
+  web:
+    image: node:22-alpine
+    working_dir: /app/web
+    command: ["sh", "-ec", "npm install --no-audit --no-fund --prefer-offline && exec npm run dev"]
+    environment:
+      NODE_ENV: development
+      API_PROXY_TARGET: http://api:8000
+    volumes:
+      - ./web:/app/web
+      - web_node_modules:/app/web/node_modules
+    ports:
+      - "3000:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -q -T 3 -O /dev/null http://127.0.0.1:5173/ || (echo 'web: vite chua phuc vu trang'; exit 1); wget -q -T 3 -O /dev/null http://127.0.0.1:5173/api/healthz || (echo 'web: proxy /api -> api loi'; exit 1)"]
+      interval: 10s
+      timeout: 6s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  api_node_modules:
+  web_node_modules:

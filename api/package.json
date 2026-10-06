@@ -1,0 +1,14 @@
+{
+  "name": "sky-ledger-api",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Live mirror service for the MUST · Gift Sky feed (must.ware.baby): polls the upstream cloud feed and pushes snapshots to clients over SSE.",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

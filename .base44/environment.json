@@ -1,0 +1,13 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    {
+      "name": "UPSTREAM_TOKEN",
+      "description": "Bearer token cho nguồn dữ liệu trực tiếp của must.ware.baby (Cloudflare Worker). Không bắt buộc: .env.base44-defaults đã kèm token đọc công khai của trang đó, app chạy được ngay. Đặt secret này nếu muốn dùng token riêng (ví dụ khi token công khai bị đổi).",
+      "requiredAtBoot": false,
+      "generatedForDevelopment": false
+    }
+  ]
+}

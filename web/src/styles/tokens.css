@@ -1,0 +1,202 @@
+/* ============================================================
+   Sổ Trời — design tokens
+   Mỗi chủ đề chỉ đổi token; toàn bộ giao diện tự theo.
+   --hue-base/--hue-step sinh ra dải màu 6 cột riêng cho từng chủ đề.
+   ============================================================ */
+
+:root {
+  --font-display: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+  --font-head: 'Space Grotesk', 'Be Vietnam Pro', sans-serif;
+  --font-body: 'Be Vietnam Pro', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --r-xl: 28px;
+  --r-lg: 20px;
+  --r-md: 14px;
+  --r-sm: 10px;
+
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur: 0.4s;
+}
+
+html[data-theme='gold'] {
+  --bg-0: #06060c;
+  --bg-1: #0a0a12;
+  --bg-2: #101019;
+  --surface: rgba(255, 255, 255, 0.038);
+  --surface-2: rgba(255, 255, 255, 0.062);
+  --line: rgba(255, 255, 255, 0.075);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --txt-0: #f7f2e8;
+  --txt-1: #c3b9a7;
+  --txt-2: #857c6d;
+  --acc: #e9c87b;
+  --acc-2: #9adcff;
+  --acc-soft: rgba(233, 200, 123, 0.13);
+  --ok: #6ee7b7;
+  --warn: #fbbf24;
+  --err: #fb7185;
+  --glow: rgba(233, 200, 123, 0.26);
+  --sheet-1: rgba(20, 17, 12, 0.72);
+  --sheet-2: rgba(9, 9, 15, 0.86);
+  --sat: 68%;
+  --light: 66%;
+  --hue-base: 42;
+  --hue-step: 26;
+}
+
+html[data-theme='neon'] {
+  --bg-0: #07060d;
+  --bg-1: #0d0b18;
+  --bg-2: #131022;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-2: rgba(255, 255, 255, 0.07);
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --txt-0: #f4eefc;
+  --txt-1: #c4bad8;
+  --txt-2: #8d81a8;
+  --acc: #ff2ec4;
+  --acc-2: #00e5ff;
+  --acc-soft: rgba(255, 46, 196, 0.15);
+  --ok: #00ffb2;
+  --warn: #ffd166;
+  --err: #ff5d7a;
+  --glow: rgba(255, 46, 196, 0.3);
+  --sheet-1: rgba(24, 18, 44, 0.66);
+  --sheet-2: rgba(10, 8, 22, 0.86);
+  --sat: 86%;
+  --light: 64%;
+  --hue-base: 300;
+  --hue-step: 22;
+}
+
+html[data-theme='aurora'] {
+  --bg-0: #04100e;
+  --bg-1: #07181a;
+  --bg-2: #0b2224;
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface-2: rgba(255, 255, 255, 0.08);
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.19);
+  --txt-0: #eafff7;
+  --txt-1: #b7e6db;
+  --txt-2: #7aa89e;
+  --acc: #2dd4bf;
+  --acc-2: #a78bfa;
+  --acc-soft: rgba(45, 212, 191, 0.15);
+  --ok: #4ade80;
+  --warn: #fcd34d;
+  --err: #fb7185;
+  --glow: rgba(45, 212, 191, 0.28);
+  --sheet-1: rgba(10, 38, 38, 0.62);
+  --sheet-2: rgba(4, 22, 22, 0.86);
+  --sat: 62%;
+  --light: 62%;
+  --hue-base: 168;
+  --hue-step: 24;
+}
+
+html[data-theme='mint'] {
+  --bg-0: #f3faf6;
+  --bg-1: #ffffff;
+  --bg-2: #eaf6f0;
+  --surface: rgba(9, 48, 40, 0.035);
+  --surface-2: rgba(9, 48, 40, 0.06);
+  --line: rgba(9, 48, 40, 0.1);
+  --line-strong: rgba(9, 48, 40, 0.2);
+  --txt-0: #08201a;
+  --txt-1: #38564c;
+  --txt-2: #6b8a7f;
+  --acc: #0e9c80;
+  --acc-2: #65a30d;
+  --acc-soft: rgba(14, 156, 128, 0.12);
+  --ok: #15803d;
+  --warn: #b45309;
+  --err: #be123c;
+  --glow: rgba(14, 156, 128, 0.22);
+  --sheet-1: rgba(255, 255, 255, 0.86);
+  --sheet-2: rgba(244, 252, 248, 0.92);
+  --sat: 78%;
+  --light: 34%;
+  --hue-base: 168;
+  --hue-step: 26;
+}
+
+html[data-theme='term'] {
+  --bg-0: #050a06;
+  --bg-1: #071109;
+  --bg-2: #0a170d;
+  --surface: rgba(0, 255, 102, 0.05);
+  --surface-2: rgba(0, 255, 102, 0.08);
+  --line: rgba(0, 255, 102, 0.16);
+  --line-strong: rgba(0, 255, 102, 0.3);
+  --txt-0: #d7ffe4;
+  --txt-1: #8fe8ac;
+  --txt-2: #5da678;
+  --acc: #00ff66;
+  --acc-2: #7dffb0;
+  --acc-soft: rgba(0, 255, 102, 0.13);
+  --ok: #00ff66;
+  --warn: #d7ff4d;
+  --err: #ff5d7a;
+  --glow: rgba(0, 255, 102, 0.26);
+  --sheet-1: rgba(6, 24, 12, 0.72);
+  --sheet-2: rgba(3, 12, 6, 0.88);
+  --sat: 92%;
+  --light: 56%;
+  --hue-base: 132;
+  --hue-step: 12;
+}
+
+html[data-theme='wave'] {
+  --bg-0: #120a20;
+  --bg-1: #1a0f2e;
+  --bg-2: #241540;
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-2: rgba(255, 255, 255, 0.085);
+  --line: rgba(255, 255, 255, 0.11);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --txt-0: #fdeaf7;
+  --txt-1: #d8b7d4;
+  --txt-2: #a17f9e;
+  --acc: #ff7edb;
+  --acc-2: #ffb35c;
+  --acc-soft: rgba(255, 126, 219, 0.16);
+  --ok: #7dffb0;
+  --warn: #ffb35c;
+  --err: #ff5d7a;
+  --glow: rgba(255, 126, 219, 0.3);
+  --sheet-1: rgba(48, 22, 74, 0.62);
+  --sheet-2: rgba(22, 10, 36, 0.86);
+  --sat: 84%;
+  --light: 70%;
+  --hue-base: 300;
+  --hue-step: 30;
+}
+
+html[data-theme='ice'] {
+  --bg-0: #050c1c;
+  --bg-1: #08152c;
+  --bg-2: #0d1f3c;
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-2: rgba(255, 255, 255, 0.085);
+  --line: rgba(255, 255, 255, 0.11);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --txt-0: #e8f3ff;
+  --txt-1: #b3cbe6;
+  --txt-2: #7c95b3;
+  --acc: #38bdf8;
+  --acc-2: #818cf8;
+  --acc-soft: rgba(56, 189, 248, 0.15);
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --err: #fb7185;
+  --glow: rgba(56, 189, 248, 0.3);
+  --sheet-1: rgba(12, 32, 62, 0.62);
+  --sheet-2: rgba(5, 14, 30, 0.88);
+  --sat: 80%;
+  --light: 66%;
+  --hue-base: 196;
+  --hue-step: 22;
+}
