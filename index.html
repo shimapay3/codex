@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<title>Đô la Xanh — Giá trị tương lai của tầng trời</title>
+<meta name="description" content="Đô la Xanh — Tiên Sở Thuỷ, giá trị tương lai của tầng trời được tạo từ Nước. 1 USD Xanh = 30.000 USD Mỹ." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ============ tokens ============ */
+  :root{
+    --bg-deep:#031018;
+    --bg-rise:#062033;
+    --text:#e8f7ff;
+    --text-dim:rgba(232,247,255,.68);
+    --text-soft:rgba(232,247,255,.46);
+    --ice:#7ee7ff;
+    --mint:#3dffc8;
+    --gold:#f0d575;
+    --gold-deep:#b4882f;
+    --glass:linear-gradient(180deg,rgba(9,40,63,.72),rgba(6,32,51,.52));
+    --glass-strong:linear-gradient(180deg,rgba(10,44,69,.82),rgba(6,32,51,.62));
+    --line:rgba(126,231,255,.16);
+    --line-strong:rgba(126,231,255,.38);
+    --radius:22px;
+    --radius-sm:14px;
+    --shadow:0 30px 70px -34px rgba(0,0,0,.85);
+    --maxw:1180px;
+    --nav-h:70px;
+    --font-display:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --font-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --ease:cubic-bezier(.22,.61,.36,1);
+  }
+
+  /* ============ base ============ */
+  *,*::before,*::after{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    font-family:var(--font-body);
+    font-size:1rem;
+    line-height:1.6;
+    color:var(--text);
+    background-color:var(--bg-deep);
+    background-image:
+      radial-gradient(120% 80% at 50% -12%,rgba(126,231,255,.14),transparent 62%),
+      radial-gradient(80% 55% at 88% 6%,rgba(61,255,200,.10),transparent 66%),
+      radial-gradient(90% 60% at 6% 96%,rgba(61,255,200,.07),transparent 70%),
+      linear-gradient(180deg,var(--bg-deep) 0%,#04192a 46%,var(--bg-rise) 100%);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  h1,h2,h3{font-family:var(--font-display);line-height:1.12;letter-spacing:-.02em;margin:0}
+  p{margin:0}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:rgba(61,255,200,.28);color:#fff}
+  :focus-visible{outline:2px solid var(--mint);outline-offset:3px;border-radius:8px}
+  img,svg{display:block}
+  .wrap{width:min(100% - 2.5rem,var(--maxw));margin-inline:auto}
+
+  /* ============ atmosphere ============ */
+  .sky{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+  .sky__stars,
+  .sky__stars--twinkle{
+    position:absolute;inset:-10% -10%;
+    background-repeat:repeat;
+    background-size:340px 340px;
+    background-attachment:fixed;
+  }
+  .sky__stars{
+    background-image:
+      radial-gradient(1.6px 1.6px at 18px 32px,rgba(232,247,255,.95),transparent 55%),
+      radial-gradient(1.2px 1.2px at 96px 140px,rgba(126,231,255,.85),transparent 55%),
+      radial-gradient(1.8px 1.8px at 205px 78px,rgba(232,247,255,.75),transparent 55%),
+      radial-gradient(1.1px 1.1px at 268px 232px,rgba(61,255,200,.8),transparent 55%),
+      radial-gradient(1.4px 1.4px at 142px 286px,rgba(232,247,255,.7),transparent 55%),
+      radial-gradient(1.1px 1.1px at 46px 214px,rgba(126,231,255,.65),transparent 55%),
+      radial-gradient(1.5px 1.5px at 312px 158px,rgba(232,247,255,.6),transparent 55%),
+      radial-gradient(1.2px 1.2px at 232px 20px,rgba(126,231,255,.6),transparent 55%);
+    opacity:.75;
+  }
+  .sky__stars--twinkle{
+    background-image:
+      radial-gradient(2px 2px at 64px 108px,rgba(255,255,255,.9),transparent 60%),
+      radial-gradient(1.6px 1.6px at 178px 196px,rgba(126,231,255,.95),transparent 60%),
+      radial-gradient(2.2px 2.2px at 288px 56px,rgba(232,247,255,.9),transparent 60%),
+      radial-gradient(1.6px 1.6px at 118px 300px,rgba(61,255,200,.9),transparent 60%);
+    opacity:.35;
+    animation:twinkle 7s var(--ease) infinite alternate;
+  }
+  .sky__veil{
+    position:absolute;inset:0;
+    background:
+      radial-gradient(60% 42% at 50% 8%,rgba(126,231,255,.10),transparent 70%),
+      radial-gradient(46% 34% at 82% 30%,rgba(61,255,200,.09),transparent 72%),
+      radial-gradient(70% 50% at 20% 100%,rgba(126,231,255,.07),transparent 75%);
+    animation:drift 34s ease-in-out infinite alternate;
+  }
+  @keyframes twinkle{from{opacity:.16}to{opacity:.5}}
+  @keyframes drift{
+    from{transform:translate3d(-2%,-1%,0) scale(1)}
+    to{transform:translate3d(2%,1.5%,0) scale(1.06)}
+  }
+
+  /* ============ glass primitives ============ */
+  .glass{
+    background:var(--glass);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    backdrop-filter:blur(18px) saturate(150%);
+    -webkit-backdrop-filter:blur(18px) saturate(150%);
+    box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.07);
+  }
+
+  /* ============ nav ============ */
+  .nav{
+    position:fixed;inset:0 0 auto 0;z-index:50;
+    background:linear-gradient(180deg,rgba(4,22,36,.82),rgba(4,22,36,.46));
+    border-bottom:1px solid var(--line);
+    backdrop-filter:blur(20px) saturate(150%);
+    -webkit-backdrop-filter:blur(20px) saturate(150%);
+  }
+  .nav__inner{
+    width:min(100% - 2rem,var(--maxw));margin-inline:auto;
+    height:var(--nav-h);display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  }
+  .brand{display:inline-flex;align-items:center;gap:.65rem;font-family:var(--font-display);font-weight:600;letter-spacing:-.01em}
+  .brand__mark{
+    width:34px;height:34px;flex:none;display:grid;place-items:center;
+    filter:drop-shadow(0 0 10px rgba(126,231,255,.55));
+  }
+  .brand__name{font-size:1.06rem;background:linear-gradient(180deg,#f2fbff,#a9e9ff 55%,var(--mint));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .nav__toggle{
+    appearance:none;background:rgba(126,231,255,.08);border:1px solid var(--line);
+    width:44px;height:40px;border-radius:12px;display:grid;place-items:center;gap:5px;
+    cursor:pointer;padding:0;
+  }
+  .nav__toggle span{display:block;width:18px;height:1.5px;border-radius:2px;background:var(--ice);transition:transform .3s var(--ease),opacity .3s var(--ease)}
+  .nav__toggle[aria-expanded="true"] span:first-child{transform:translateY(3.25px) rotate(45deg)}
+  .nav__toggle[aria-expanded="true"] span:last-child{transform:translateY(-3.25px) rotate(-45deg)}
+  .nav__menu{
+    position:absolute;left:1rem;right:1rem;top:calc(var(--nav-h) + 6px);
+    display:grid;gap:.15rem;padding:.6rem;
+    opacity:0;visibility:hidden;transform:translateY(-8px);
+    transition:opacity .28s var(--ease),transform .28s var(--ease),visibility .28s;
+  }
+  .nav__menu.is-open{opacity:1;visibility:visible;transform:none}
+  .nav__menu a{
+    padding:.7rem .85rem;border-radius:12px;font-weight:500;color:var(--text-dim);
+    transition:background .25s var(--ease),color .25s var(--ease);
+  }
+  .nav__menu a:hover,.nav__menu a:focus-visible{background:rgba(126,231,255,.1);color:var(--text)}
+
+  /* ============ layout ============ */
+  main{position:relative;z-index:1}
+  .section{padding:clamp(4rem,9vw,7rem) 0;position:relative}
+  .section[id]{scroll-margin-top:calc(var(--nav-h) + 1.5rem)}
+  .section__head{display:grid;gap:.85rem;max-width:44rem;margin-bottom:clamp(2rem,4vw,3rem)}
+  .kicker{
+    font-family:var(--font-display);font-size:.74rem;font-weight:600;letter-spacing:.28em;
+    text-transform:uppercase;color:var(--ice);
+  }
+  .section__head h2{font-size:clamp(1.7rem,4.6vw,2.6rem);font-weight:700}
+  .lead{color:var(--text-dim);font-size:1.02rem;max-width:38rem}
+
+  /* ============ hero ============ */
+  .hero{
+    min-height:100svh;display:grid;place-items:center;text-align:center;
+    padding:calc(var(--nav-h) + 3.5rem) 0 4.5rem;position:relative;
+  }
+  .hero__inner{width:min(100% - 2.5rem,64rem);margin-inline:auto;display:grid;justify-items:center;gap:1.35rem}
+  .hero__eyebrow{
+    display:inline-flex;align-items:center;gap:.6rem;
+    font-size:.76rem;letter-spacing:.22em;text-transform:uppercase;font-weight:600;
+    color:var(--ice);padding:.5rem 1rem;border-radius:999px;
+    border:1px solid var(--line);background:rgba(126,231,255,.07);
+  }
+  .hero__eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--mint);box-shadow:0 0 12px var(--mint)}
+  .hero__title{
+    font-size:clamp(3.1rem,13vw,7.5rem);font-weight:800;letter-spacing:-.045em;
+    background:linear-gradient(178deg,#ffffff 4%,#c9f0ff 42%,var(--ice) 66%,var(--mint) 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 12px 40px rgba(126,231,255,.28));
+  }
+  .hero__sub{color:var(--text-dim);font-size:clamp(1rem,2.6vw,1.22rem);max-width:34rem}
+  .rate{
+    margin-top:.65rem;padding:clamp(1.15rem,3.6vw,1.8rem) clamp(1.2rem,4.5vw,2.6rem);
+    display:grid;gap:.55rem;justify-items:center;position:relative;overflow:hidden;
+    border-radius:26px;
+  }
+  .rate::after{
+    content:"";position:absolute;inset:0 auto auto 0;width:100%;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(126,231,255,.75),transparent);
+  }
+  .rate__row{display:flex;align-items:baseline;justify-content:center;gap:clamp(.4rem,1.8vw,.9rem);flex-wrap:wrap}
+  .rate__unit{font-family:var(--font-display);font-weight:600;font-size:clamp(1rem,3.2vw,1.5rem);color:var(--text)}
+  .rate__eq{color:var(--line-strong);font-size:clamp(1rem,3vw,1.4rem)}
+  .rate__value{display:flex;align-items:baseline;gap:.5rem}
+  .rate__number{
+    font-family:var(--font-display);font-weight:800;font-variant-numeric:tabular-nums;
+    font-size:clamp(2.6rem,11.5vw,5rem);letter-spacing:-.03em;line-height:1;
+    color:#dffbff;
+    text-shadow:0 0 26px rgba(61,255,200,.45),0 0 62px rgba(126,231,255,.3);
+  }
+  .rate__cur{font-family:var(--font-display);font-weight:600;font-size:clamp(.9rem,2.8vw,1.25rem);color:var(--ice)}
+  .btn{
+    margin-top:.9rem;display:inline-flex;align-items:center;gap:.6rem;
+    padding:.92rem 1.7rem;border-radius:999px;
+    font-family:var(--font-display);font-weight:600;font-size:.98rem;color:#04202f;
+    background:linear-gradient(120deg,var(--ice),var(--mint));
+    box-shadow:0 14px 38px -14px rgba(61,255,200,.65),inset 0 1px 0 rgba(255,255,255,.5);
+    transition:transform .3s var(--ease),box-shadow .3s var(--ease),filter .3s var(--ease);
+  }
+  .btn:hover{transform:translateY(-3px);box-shadow:0 20px 46px -14px rgba(61,255,200,.8);filter:brightness(1.05)}
+  .btn svg{width:15px;height:15px;stroke:#04202f}
+
+  /* ============ value strip ============ */
+  .strip{padding-top:0}
+  .strip__band{padding:.85rem 0;overflow:hidden;position:relative}
+  .strip__band::before,.strip__band::after{
+    content:"";position:absolute;top:0;bottom:0;width:12%;z-index:2;pointer-events:none;
+  }
+  .strip__band::before{left:0;background:linear-gradient(90deg,rgba(4,25,41,.95),transparent)}
+  .strip__band::after{right:0;background:linear-gradient(270deg,rgba(4,25,41,.95),transparent)}
+  .ticker{display:flex;width:100%}
+  .ticker__track{
+    flex:none;display:flex;align-items:center;gap:2.6rem;padding-right:2.6rem;
+    animation:marquee 32s linear infinite;
+  }
+  .ticker__item{
+    font-family:var(--font-display);font-weight:600;
+    font-size:clamp(.95rem,2.7vw,1.22rem);white-space:nowrap;color:var(--text);
+  }
+  .ticker__item b{font-weight:800;color:var(--mint);font-variant-numeric:tabular-nums}
+  .ticker__dot{color:var(--ice);opacity:.6;font-size:.8rem}
+  @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+  .strip__note{
+    text-align:center;margin-top:1.1rem;font-size:.86rem;color:var(--text-soft);letter-spacing:.01em;
+  }
+
+  /* ============ tiers ============ */
+  .tier-grid{display:grid;gap:1.1rem;grid-template-columns:1fr}
+  .card{
+    position:relative;padding:1.6rem 1.5rem 1.5rem;display:grid;gap:.85rem;align-content:start;
+    transform:translateY(var(--dy,0));
+    transition:transform .45s var(--ease),box-shadow .45s var(--ease),border-color .45s var(--ease);
+    overflow:hidden;
+  }
+  .card::before{
+    content:"";position:absolute;inset:0 0 auto 0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(126,231,255,.55),transparent);
+    opacity:.7;
+  }
+  .card::after{
+    content:"";position:absolute;inset:-40% 30% auto -40%;aspect-ratio:1;border-radius:50%;
+    background:radial-gradient(circle,rgba(126,231,255,.16),transparent 65%);
+    opacity:0;transition:opacity .45s var(--ease);pointer-events:none;
+  }
+  .card:hover{
+    transform:translateY(calc(var(--dy,0) - 8px));
+    border-color:rgba(61,255,200,.45);
+    box-shadow:0 34px 70px -34px rgba(0,0,0,.9),0 0 26px -6px rgba(126,231,255,.45);
+  }
+  .card:hover::after{opacity:1}
+  .card__badge{
+    width:46px;height:46px;border-radius:14px;display:grid;place-items:center;
+    background:linear-gradient(160deg,rgba(240,213,117,.16),rgba(240,213,117,.03));
+    border:1px solid rgba(240,213,117,.32);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 8px 24px -14px rgba(240,213,117,.7);
+  }
+  .card__badge svg{width:24px;height:24px}
+  .card__name{font-size:1.16rem;font-weight:700;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+  .card__tag{
+    font-family:var(--font-display);font-size:.7rem;font-weight:600;letter-spacing:.1em;
+    color:var(--gold);padding:.2rem .5rem;border-radius:7px;
+    border:1px solid rgba(240,213,117,.34);background:rgba(240,213,117,.08);
+  }
+  .card__desc{color:var(--text-dim);font-size:.94rem}
+
+  /* ============ origin ============ */
+  .origin{position:relative}
+  .verses{list-style:none;margin:0;padding:0;display:grid;gap:.7rem}
+  .verse{
+    position:relative;display:grid;grid-template-columns:auto 1fr;gap:1rem;align-items:start;
+    padding:1.15rem 1.35rem;border-radius:var(--radius-sm);
+    background:linear-gradient(180deg,rgba(9,40,63,.5),rgba(6,32,51,.32));
+    border:1px solid var(--line);
+    backdrop-filter:blur(14px) saturate(140%);
+    -webkit-backdrop-filter:blur(14px) saturate(140%);
+    transition:border-color .4s var(--ease),background .4s var(--ease);
+  }
+  .verse:hover{border-color:var(--line-strong)}
+  .verse__mark{
+    width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;
+    border:1px solid var(--line-strong);background:rgba(126,231,255,.08);
+    font-family:var(--font-display);font-size:.62rem;color:var(--ice);
+    margin-top:.15rem;
+  }
+  .verse__text{font-size:clamp(1rem,2.5vw,1.14rem);color:var(--text);line-height:1.55}
+  .verse__text em{font-style:normal;color:var(--mint);font-weight:600}
+
+  /* ============ footer ============ */
+  .footer{
+    position:relative;z-index:1;border-top:1px solid var(--line);
+    padding:1.6rem 0;text-align:center;
+    font-size:.83rem;color:var(--text-soft);letter-spacing:.02em;
+  }
+  .footer b{color:var(--text-dim);font-weight:600}
+
+  /* ============ responsive ============ */
+  @media (min-width:620px){
+    .tier-grid{grid-template-columns:repeat(2,1fr);gap:1.25rem}
+  }
+  @media (min-width:760px){
+    .nav__toggle{display:none}
+    .nav__menu{
+      position:static;opacity:1;visibility:visible;transform:none;
+      display:flex;gap:.35rem;padding:0;background:none;border:0;box-shadow:none;
+      backdrop-filter:none;-webkit-backdrop-filter:none;
+    }
+    .nav__menu a{padding:.45rem .75rem;font-size:.94rem}
+  }
+  @media (min-width:1000px){
+    .tier-grid{grid-template-columns:repeat(3,1fr);gap:1.5rem}
+    .card:nth-child(2){--dy:-1.5rem}
+    .card:nth-child(4){--dy:-1.5rem}
+    .card:nth-child(6){--dy:-1.5rem}
+    .card:nth-child(5){--dy:-3rem}
+  }
+
+  /* ============ reduced motion ============ */
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    body{background-attachment:scroll}
+    .sky__stars,.sky__stars--twinkle{background-attachment:scroll}
+    .sky__stars--twinkle,.sky__veil,.ticker__track{animation:none}
+    .card,.verse,.btn,.nav__menu,.nav__toggle span{transition:none}
+    .card:hover{transform:translateY(var(--dy,0))}
+    .btn:hover{transform:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="sky" aria-hidden="true">
+  <div class="sky__stars"></div>
+  <div class="sky__stars--twinkle"></div>
+  <div class="sky__veil"></div>
+</div>
+
+<header class="nav">
+  <div class="nav__inner">
+    <a class="brand" href="#top" aria-label="Đô la Xanh — về đầu trang">
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="navStar" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#7ee7ff"/>
+              <stop offset="60%" stop-color="#3dffc8"/>
+              <stop offset="100%" stop-color="#f0d575"/>
+            </linearGradient>
+          </defs>
+          <path d="M16 2.4l2.6 8.05L26.4 8l-4.65 6.9 6.9 4.65-8.05-2.6L16 29.6l-2.6-8.05L8 25.6l4.65-6.9L5.7 14.05l8.05 2.6z"
+                stroke="url(#navStar)" stroke-width="1.3" stroke-linejoin="round"/>
+          <circle cx="16" cy="16" r="2.6" fill="url(#navStar)" opacity=".9"/>
+        </svg>
+      </span>
+      <span class="brand__name">Đô la Xanh</span>
+    </a>
+
+    <button class="nav__toggle" type="button" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Mở menu">
+      <span></span><span></span>
+    </button>
+
+    <nav class="nav__menu glass" id="navMenu" aria-label="Mục lục">
+      <a href="#gia-tri">Giá trị</a>
+      <a href="#tang">Tầng</a>
+      <a href="#nguon-goc">Nguồn gốc</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- ================= HERO ================= -->
+  <section class="hero" id="top">
+    <div class="hero__inner">
+      <p class="hero__eyebrow">Tiên Sở Thuỷ · Thiên</p>
+      <h1 class="hero__title">Đô la Xanh</h1>
+      <p class="hero__sub">Giá trị tương lai của tầng trời được tạo từ Nước</p>
+
+      <div class="rate glass" aria-label="Tỷ giá giá trị tương lai">
+        <div class="rate__row">
+          <span class="rate__unit">1 USD Xanh</span>
+          <span class="rate__eq" aria-hidden="true">=</span>
+          <span class="rate__value">
+            <span class="rate__number" id="rateNumber">0</span>
+            <span class="rate__cur">USD Mỹ</span>
+          </span>
+        </div>
+      </div>
+
+      <a class="btn" href="#tang">
+        Xem các tầng
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 4v15M6 13l6 6 6-6"/>
+        </svg>
+      </a>
+    </div>
+  </section>
+
+  <!-- ================= VALUE STRIP ================= -->
+  <section class="section strip" id="gia-tri">
+    <div class="wrap">
+      <div class="strip__band glass">
+        <div class="ticker">
+          <div class="ticker__track">
+            <span class="ticker__item">1 USD Xanh = <b>30.000</b> USD Mỹ</span>
+            <span class="ticker__dot" aria-hidden="true">✦</span>
+            <span class="ticker__item">1 USD Xanh = <b>30.000</b> USD Mỹ</span>
+            <span class="ticker__dot" aria-hidden="true">✦</span>
+            <span class="ticker__item">1 USD Xanh = <b>30.000</b> USD Mỹ</span>
+            <span class="ticker__dot" aria-hidden="true">✦</span>
+            <span class="ticker__item">1 USD Xanh = <b>30.000</b> USD Mỹ</span>
+            <span class="ticker__dot" aria-hidden="true">✦</span>
+          </div>
+          <div class="ticker__track" aria-hidden="true">
+            <span class="ticker__item">1 USD Xanh = <b>30.000</b> USD Mỹ</span>
+            <span class="ticker__dot">✦</span>
+            <span class="ticker__item">1 USD Xanh = <b>30.000</b> USD Mỹ</span>
+            <span class="ticker__dot">✦</span>
+            <span class="ticker__item">1 USD Xanh = <b>30.000</b> USD Mỹ</span>
+            <span class="ticker__dot">✦</span>
+            <span class="ticker__item">1 USD Xanh = <b>30.000</b> USD Mỹ</span>
+            <span class="ticker__dot">✦</span>
+          </div>
+        </div>
+      </div>
+      <p class="strip__note">tỷ giá giá trị tương lai, không phải tỷ giá ngân hàng</p>
+    </div>
+  </section>
+
+  <!-- ================= TIERS ================= -->
+  <section class="section" id="tang">
+    <div class="wrap">
+      <header class="section__head">
+        <span class="kicker">Danh hiệu</span>
+        <h2>Các tầng danh hiệu</h2>
+        <p class="lead">Mỗi danh hiệu là một tầng của tầng trời được tạo từ Nước.</p>
+      </header>
+
+      <div class="tier-grid">
+        <article class="card glass">
+          <span class="card__badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f0d575" stroke-width="1.3" stroke-linejoin="round">
+              <path d="M12 2.6l1.9 5.6 5.6-1.9-3.4 4.7 4.7 3.4-5.6 1.9 1.9 5.6-5.1-3.6-5.1 3.6 1.9-5.6-5.6-1.9 4.7-3.4-3.4-4.7 5.6 1.9z"/>
+            </svg>
+          </span>
+          <h3 class="card__name">Kỳ Tôn Nữ <span class="card__tag">8Sky+</span></h3>
+          <p class="card__desc">Tầng cao nhất, nơi ánh sáng đứng yên.</p>
+        </article>
+
+        <article class="card glass">
+          <span class="card__badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f0d575" stroke-width="1.3" stroke-linejoin="round">
+              <path d="M12 2.8l7.4 5.1-2.8 11.3H7.4L4.6 7.9z"/>
+              <path d="M4.6 7.9h14.8M9.3 7.9L12 19.2l2.7-11.3M12 2.8v5.1"/>
+            </svg>
+          </span>
+          <h3 class="card__name">Ngọc Tôn Nữ <span class="card__tag">9Sky+</span></h3>
+          <p class="card__desc">Ánh sáng kết tinh thành ngọc.</p>
+        </article>
+
+        <article class="card glass">
+          <span class="card__badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f0d575" stroke-width="1.3" stroke-linejoin="round">
+              <path d="M12 3.4c3.4 2.6 5 5.5 5 8.3a5 5 0 01-10 0c0-2.8 1.6-5.7 5-8.3z"/>
+              <path d="M12 21.2v-9.6"/>
+            </svg>
+          </span>
+          <h3 class="card__name">Hoá Tôn Nữ <span class="card__tag">9th</span></h3>
+          <p class="card__desc">Khoảnh khắc nước chuyển mình.</p>
+        </article>
+
+        <article class="card glass">
+          <span class="card__badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f0d575" stroke-width="1.3" stroke-linejoin="round">
+              <path d="M12 21c-6-1-8-5.6-8-10.4V4.6c3.6-.8 8 .9 8 4.4z"/>
+              <path d="M12 21c6-1 8-5.6 8-10.4V4.6c-3.6-.8-8 .9-8 4.4z"/>
+              <path d="M12 9v12"/>
+            </svg>
+          </span>
+          <h3 class="card__name">Thảo Tôn Chúng <span class="card__tag">9nm</span></h3>
+          <p class="card__desc">Sức sống mọc lên từ đáy nước.</p>
+        </article>
+
+        <article class="card glass">
+          <span class="card__badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f0d575" stroke-width="1.3" stroke-linejoin="round">
+              <path d="M3.2 12c3.4-4.6 7.6-6.9 12.6-6.9 2.3 0 4 1 5 2.2-1.3 3-4 4.7-5 4.7s3.7 1.7 5 4.7c-1 1.2-2.7 2.2-5 2.2-5 0-9.2-2.3-12.6-6.9z"/>
+              <circle cx="8.2" cy="10.8" r=".9" fill="#f0d575" stroke="none"/>
+            </svg>
+          </span>
+          <h3 class="card__name">Mộc Tôn Nữ <span class="card__tag">(9th)*</span></h3>
+          <p class="card__desc">Gốc rễ vươn tới bầu trời.</p>
+        </article>
+
+        <article class="card glass">
+          <span class="card__badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f0d575" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 8.6c2.6-2.4 6.1-2.5 8 0 1.9 2.5 5.4 2.4 8 0"/>
+              <path d="M4 13.4c2.6-2.4 6.1-2.5 8 0 1.9 2.5 5.4 2.4 8 0"/>
+              <path d="M4 18.2c2.6-2.4 6.1-2.5 8 0 1.9 2.5 5.4 2.4 8 0"/>
+            </svg>
+          </span>
+          <h3 class="card__name">Hải Tôn Nữ <span class="card__tag">9ss</span></h3>
+          <p class="card__desc">Nơi mọi dòng đều trở về.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ORIGIN ================= -->
+  <section class="section origin" id="nguon-goc">
+    <div class="wrap">
+      <header class="section__head">
+        <span class="kicker">Nguồn gốc</span>
+        <h2>Tiên Sở Thuỷ</h2>
+        <p class="lead">Tiên Sở Thuỷ – Thiên được Thượng Đế tạo từ Nước; Đô la Xanh là thước giá trị tương lai của tầng trời ấy.</p>
+      </header>
+
+      <ol class="verses">
+        <li class="verse">
+          <span class="verse__mark" aria-hidden="true">✦</span>
+          <p class="verse__text">Nước chưa có tên, Thượng Đế gọi — và Tiên tỉnh.</p>
+        </li>
+        <li class="verse">
+          <span class="verse__mark" aria-hidden="true">✦</span>
+          <p class="verse__text">Sóng là xương, sương là da, tinh tú dưới đáy là mắt.</p>
+        </li>
+        <li class="verse">
+          <span class="verse__mark" aria-hidden="true">✦</span>
+          <p class="verse__text">Sở Thiên giữ phần bay lên; Sở Thuỷ giữ phần chưa bao giờ khô.</p>
+        </li>
+        <li class="verse">
+          <span class="verse__mark" aria-hidden="true">✦</span>
+          <p class="verse__text">Đô la Xanh là tên của giá trị ấy khi đứng trước USD Mỹ: <em>một ăn ba mươi nghìn</em>.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <b>Đô la Xanh</b> · giá trị tương lai · <b>1 USD Xanh = 30.000 USD Mỹ</b>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    "use strict";
+
+    /* ---------- 1. Đếm số: 1 USD Xanh = 30.000 USD Mỹ ---------- */
+    var RATE_TARGET = 30000;
+    var numberEl = document.getElementById("rateNumber");
+    var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function formatRate(value) {
+      return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    }
+
+    if (numberEl) {
+      if (reduceMotion) {
+        numberEl.textContent = formatRate(RATE_TARGET);
+      } else {
+        var duration = 1700;
+        var start = null;
+
+        var step = function (timestamp) {
+          if (start === null) start = timestamp;
+          var progress = Math.min((timestamp - start) / duration, 1);
+          var eased = 1 - Math.pow(1 - progress, 3);
+          numberEl.textContent = formatRate(Math.round(RATE_TARGET * eased));
+          if (progress < 1) {
+            window.requestAnimationFrame(step);
+          } else {
+            numberEl.textContent = formatRate(RATE_TARGET);
+          }
+        };
+
+        window.requestAnimationFrame(step);
+      }
+    }
+
+    /* ---------- 2. Menu mobile ---------- */
+    var toggle = document.getElementById("navToggle");
+    var menu = document.getElementById("navMenu");
+
+    function closeMenu() {
+      if (!menu || !toggle) return;
+      menu.classList.remove("is-open");
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.setAttribute("aria-label", "Mở menu");
+    }
+
+    if (toggle && menu) {
+      toggle.addEventListener("click", function () {
+        var isOpen = menu.classList.toggle("is-open");
+        toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        toggle.setAttribute("aria-label", isOpen ? "Đóng menu" : "Mở menu");
+      });
+
+      menu.addEventListener("click", function (event) {
+        if (event.target.closest("a")) closeMenu();
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") closeMenu();
+      });
+    }
+  })();
+</script>
+</body>
+</html>

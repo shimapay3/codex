@@ -1,0 +1,46 @@
+# Base44 development environment for the Đô la Xanh landing page.
+#
+# The app is a single static file (index.html) with no build step, so the "app
+# service" is a plain runtime image that serves the repository straight from the
+# bind mount. Nothing is baked into an image: edit index.html and the served
+# bytes change immediately (force a preview refresh — there is no bundler to
+# trigger hot reload).
+#
+# The service runs as root inside the container on purpose: the sandbox checkout
+# is mounted from a root-owned, non-world-readable directory, which a dropped
+# privilege (nginx workers, `USER`) cannot traverse — the server would answer 403
+# for every file. Nothing is installed at start, so there is no dependency step.
+#
+# Sandbox note: the preview proxy reaches the container through host port 3000.
+
+name: base44-dev
+
+services:
+  web:
+    image: python:3.12-slim
+    restart: on-failure
+    working_dir: /site
+    command:
+      - python
+      - -m
+      - http.server
+      - "3000"
+      - --bind
+      - 0.0.0.0
+      - --directory
+      - /site
+    ports:
+      - "3000:3000"
+    volumes:
+      # Bind mount the whole checkout, read-only: edits are live, no rebuild.
+      - .:/site:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import urllib.request,sys;
+          sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:3000/', timeout=3).status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
