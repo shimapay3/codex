@@ -168,6 +168,13 @@ input,textarea{user-select:text;-webkit-user-select:text}
 .btn--sm{font-size:12.5px;padding:8px 12px}
 .btn--xs{font-size:11.5px;padding:5px 10px;letter-spacing:.06em}
 
+/* Trên thiết bị cảm ứng, nhấn nút hai lần liên tiếp khiến trình duyệt tự phóng to cả
+   trang — đúng lỗi "bấm Sửa URL là bị zoom to". `touch-action:manipulation` bỏ
+   double-tap zoom nhưng vẫn giữ pinch zoom (không đặt maximum-scale để không phá
+   khả năng phóng to của người dùng). Ô nhập URL phải từ 16px trở lên: trình duyệt tự
+   phóng to khi focus ô nhập chữ nhỏ hơn 16px, nên đừng hạ cỡ chữ xuống nữa. */
+.btn,.input{touch-action:manipulation}
+
 .msg{margin:14px 0 0;font-size:12.5px;color:var(--muted);min-height:18px}
 .msg--sm{margin:8px 0 0;font-size:11.5px}
 .msg.is-ok{color:var(--ok)}
@@ -195,7 +202,7 @@ input,textarea{user-select:text;-webkit-user-select:text}
 .urlbar__row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .urlbar__canvas{display:block;flex:1 1 220px;min-width:0;height:34px}
 .urlbar__edit{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.input{flex:1 1 240px;min-width:0;font:inherit;font-size:13px;color:var(--text);background:rgba(2,6,12,.9);
+.input{flex:1 1 240px;min-width:0;font:inherit;font-size:16px;color:var(--text);background:rgba(2,6,12,.9);
   border:1px solid var(--line-2);border-radius:8px;padding:9px 11px}
 .input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 3px rgba(124,243,255,.14)}
 /* URL bị che khi không soạn thảo */

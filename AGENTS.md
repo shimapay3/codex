@@ -51,6 +51,11 @@ docker compose -f docker-compose.base44.yml ps    # web healthy
   trình duyệt vẫn xem được mọi thứ; đừng hứa hơn thế.
 - Lớp chắn canvas phủ trên iframe: khi đang bật, click đầu tiên chỉ để tắt lớp chắn; rời khỏi khung
   thì tự bật lại. Trang trong iframe là cross-origin nên **không thể** chặn chuột phải bên trong nó.
+- Bấm “Sửa URL” trên thiết bị cảm ứng từng làm cả trang **bị phóng to**: trình duyệt tự zoom khi
+  focus ô nhập chữ nhỏ hơn 16px, và cú nhấn đúp kích hoạt double-tap zoom của trình duyệt. Hai chốt
+  giữ việc này: `.btn,.input{touch-action:manipulation}` và `#urlInput` luôn `font-size:16px` —
+  **đừng hạ cỡ chữ ô nhập xuống dưới 16px** (và đừng thêm `maximum-scale` vào thẻ viewport, sẽ phá
+  khả năng pinch zoom của người dùng).
 - Nhiều trang chặn nhúng (`X-Frame-Options` / CSP `frame-ancestors`) ⇒ khung trắng, và
   `curl -sI` **không phải lúc nào cũng thấy** (ví dụ `news.ycombinator.com` chặn qua CSP mà curl
   không hiện `frame-ancestors`). Muốn chắc, thử bằng trình duyệt thật rồi xem console.
