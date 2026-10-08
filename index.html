@@ -4,370 +4,133 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
-<title>Chrome App trên Chrome OS · Passkey → Hello World</title>
-<meta name="description" content="Trang mẫu: phát hiện ứng dụng Chrome trên Chrome OS, đăng nhập bằng Chrome passkey (WebAuthn) rồi in ra Hello World." />
-<style>
-  :root{
-    --bg:#070b14;
-    --surface:rgba(255,255,255,.045);
-    --surface-2:rgba(255,255,255,.07);
-    --line:rgba(255,255,255,.10);
-    --text:#eaf0fb;
-    --dim:rgba(234,240,251,.66);
-    --soft:rgba(234,240,251,.42);
-    --accent:#6ea8ff;
-    --ok:#4ade80;
-    --warn:#fbbf24;
-    --bad:#f87171;
-    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
-    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-    --radius:16px;
-  }
-  *,*::before,*::after{box-sizing:border-box}
-  body{
-    margin:0;min-height:100vh;color:var(--text);font-family:var(--sans);line-height:1.55;
-    background:radial-gradient(1100px 520px at 50% -12%,#17243d 0%,#070b14 62%) no-repeat,#070b14;
-    -webkit-font-smoothing:antialiased;
-  }
-  .wrap{max-width:780px;margin:0 auto;padding:44px 20px 72px}
-
-  header{margin-bottom:28px}
-  .eyebrow{
-    display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;
-    color:var(--accent);border:1px solid rgba(110,168,255,.32);background:rgba(110,168,255,.09);
-    padding:5px 11px;border-radius:999px;margin-bottom:16px;
-  }
-  h1{font-size:clamp(24px,4.6vw,34px);line-height:1.2;margin:0 0 10px;letter-spacing:-.02em}
-  .lede{margin:0;color:var(--dim);font-size:15.5px;max-width:62ch}
-
-  .card{
-    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
-    padding:20px 20px 22px;margin-top:18px;backdrop-filter:blur(6px);
-  }
-  .card h2{display:flex;align-items:center;gap:10px;font-size:15px;margin:0 0 14px;font-weight:600;letter-spacing:.01em}
-  .n{
-    display:grid;place-items:center;width:22px;height:22px;border-radius:7px;font-size:12px;font-weight:700;
-    background:rgba(110,168,255,.16);color:var(--accent);border:1px solid rgba(110,168,255,.3);flex:none;
-  }
-  .hint{margin:0 0 14px;color:var(--soft);font-size:13px}
-
-  .rows{list-style:none;margin:0;padding:0}
-  .rows li{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;justify-content:space-between;
-    padding:11px 0;border-top:1px solid rgba(255,255,255,.06)}
-  .rows li:first-child{border-top:0;padding-top:0}
-  .rows .label{font-size:14px;color:var(--dim)}
-  .rows .who{display:block;font-size:11.5px;color:var(--soft);font-family:var(--mono)}
-  .chip{
-    font-size:12.5px;font-weight:600;white-space:nowrap;border-radius:999px;padding:3px 11px;
-    border:1px solid transparent;
-  }
-  .chip--ok{color:var(--ok);background:rgba(74,222,128,.10);border-color:rgba(74,222,128,.30)}
-  .chip--warn{color:var(--warn);background:rgba(251,191,36,.10);border-color:rgba(251,191,36,.30)}
-  .chip--bad{color:var(--bad);background:rgba(248,113,113,.10);border-color:rgba(248,113,113,.30)}
-  .chip--wait{color:var(--soft);background:rgba(255,255,255,.05);border-color:var(--line)}
-
-  .verdict{
-    margin:16px 0 0;padding:12px 14px;border-radius:12px;font-size:13.5px;
-    background:var(--surface-2);border:1px solid var(--line);color:var(--dim);
-  }
-  .verdict b{color:var(--text)}
-
-  .actions{display:flex;flex-wrap:wrap;gap:10px}
-  .btn{
-    appearance:none;font:inherit;font-size:14px;font-weight:600;color:var(--text);cursor:pointer;
-    background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:10px 15px;
-    transition:transform .12s ease,background .16s ease,border-color .16s ease;
-  }
-  .btn:hover:not(:disabled){background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.22)}
-  .btn:active:not(:disabled){transform:translateY(1px)}
-  .btn:disabled{opacity:.42;cursor:not-allowed}
-  .btn--primary{background:linear-gradient(180deg,#5b9bff,#3d7ff0);border-color:#3d7ff0;color:#fff}
-  .btn--primary:hover:not(:disabled){background:linear-gradient(180deg,#6ea8ff,#4a89f5);border-color:#6ea8ff}
-  .btn--ghost{color:var(--dim);background:transparent}
-
-  .msg{margin:14px 0 0;font-size:13.5px;color:var(--dim);min-height:20px}
-  .msg.is-ok{color:var(--ok)}
-  .msg.is-bad{color:var(--bad)}
-
-  .out{
-    font-family:var(--mono);font-size:clamp(22px,5vw,30px);letter-spacing:.01em;
-    border-radius:12px;padding:22px 18px;text-align:center;border:1px dashed var(--line);
-    background:rgba(0,0,0,.25);color:var(--soft);overflow-wrap:anywhere;
-  }
-  .out.unlocked{
-    border:1px solid rgba(74,222,128,.38);background:linear-gradient(180deg,rgba(74,222,128,.12),rgba(74,222,128,.03));
-    color:var(--ok);font-weight:600;
-  }
-  .out.unlocked{animation:pop .34s cubic-bezier(.2,.8,.3,1)}
-  @keyframes pop{from{opacity:0;transform:translateY(6px) scale(.99)}to{opacity:1;transform:none}}
-  .meta{margin:12px 0 0;font-size:12.5px;color:var(--soft);font-family:var(--mono);overflow-wrap:anywhere}
-
-  footer{margin-top:26px;color:var(--soft);font-size:12.5px;text-align:center}
-
-  @media (prefers-reduced-motion:reduce){
-    *{animation-duration:.001ms !important;transition-duration:.001ms !important}
-    html{scroll-behavior:auto}
-  }
-</style>
+<title>Trạm điều khiển · Chrome OS + Chrome passkey</title>
+<meta name="description" content="Trang mẫu: phát hiện ứng dụng Chrome trên Chrome OS, mở khoá bằng Chrome passkey (WebAuthn), rồi mở các ứng dụng web trong khung xem được bảo vệ." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%2305070f'/%3E%3Cellipse cx='16' cy='16' rx='13' ry='5' fill='none' stroke='%237cf3ff' stroke-width='1.5' transform='rotate(-25 16 16)'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23ff8a3d'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <span class="eyebrow">Trang web mẫu · WebAuthn</span>
-    <h1>Ứng dụng Chrome trên Chrome OS + Chrome passkey</h1>
-    <p class="lede">Trang kiểm tra xem nó đang chạy trong ứng dụng Chrome (Chrome App) trên Chrome OS hay không,
-      đăng nhập bằng passkey qua WebAuthn, rồi in ra <b>Hello World</b>.</p>
-  </header>
+  <canvas class="bg-stars" id="stars" aria-hidden="true"></canvas>
+  <div class="bg-nebula" aria-hidden="true"></div>
+  <div class="bg-grain" aria-hidden="true"></div>
 
-  <main>
-    <section class="card">
-      <h2><span class="n">1</span> Phát hiện môi trường</h2>
-      <ul class="rows" id="rows"></ul>
-      <p class="verdict" id="verdict">Đang kiểm tra…</p>
-    </section>
+  <div class="shell">
+    <div class="ribbon">
+      <span class="ribbon__dot" id="ribbonDot"></span>
+      <span class="mono ribbon__text" id="ribbonText">HỆ THỐNG · ĐANG KIỂM TRA</span>
+      <span class="ribbon__gap"></span>
+      <span class="mono ribbon__guard" id="ribbonGuard">LỚP BẢO VỆ · BẬT</span>
+      <span class="mono ribbon__clock" id="ribbonClock">--:--:--</span>
+    </div>
 
-    <section class="card">
-      <h2><span class="n">2</span> Đăng nhập bằng Chrome passkey</h2>
-      <p class="hint">Passkey được tạo và lưu trên chính thiết bị này (platform authenticator). Trang mẫu không có
-        máy chủ xác minh — credential id chỉ được lưu trong <span style="font-family:var(--mono)">localStorage</span> để minh hoạ luồng đăng nhập.</p>
-      <div class="actions">
-        <button class="btn btn--primary" id="btnRegister" type="button">Tạo passkey &amp; đăng nhập</button>
-        <button class="btn" id="btnLogin" type="button">Đăng nhập bằng passkey đã lưu</button>
-        <button class="btn btn--ghost" id="btnReset" type="button">Xoá passkey trên máy này</button>
+    <header class="hero">
+      <p class="eyebrow">TRANG WEB MẪU · WEBAUTHN</p>
+      <h1>Ứng dụng Chrome trên Chrome&nbsp;OS <span class="hero__plus">+</span> Chrome passkey</h1>
+      <p class="lede">Phát hiện môi trường đang chạy, mở cửa khoang bằng passkey, rồi chọn ứng dụng web và xem nó
+        trong khung được bảo vệ — khung tự co giãn theo mọi kích thước.</p>
+
+      <div class="cluster">
+        <div class="cluster__item">
+          <span class="mono cluster__k">MÔI TRƯỜNG</span>
+          <b id="cEnv">—</b>
+        </div>
+        <div class="cluster__item">
+          <span class="mono cluster__k">PASSKEY</span>
+          <b id="cPass">—</b>
+        </div>
+        <div class="cluster__item">
+          <span class="mono cluster__k">KHUNG BẢO VỆ</span>
+          <b id="cGuard">ĐANG BẬT</b>
+        </div>
       </div>
-      <p class="msg" id="msg" role="status" aria-live="polite"></p>
-    </section>
+    </header>
 
-    <section class="card">
-      <h2><span class="n">3</span> Kết quả</h2>
-      <div class="out" id="out">Chưa đăng nhập</div>
-      <p class="meta" id="meta">Đăng nhập bằng passkey để in ra Hello World.</p>
-    </section>
-  </main>
+    <main class="decks">
+      <section class="deck" id="deckEnv">
+        <div class="deck__head">
+          <span class="mono deck__no">01</span>
+          <h2>Phát hiện môi trường</h2>
+          <span class="mono deck__meta" id="envMeta">ĐANG ĐỌC…</span>
+        </div>
+        <ul class="rows" id="rows"></ul>
+        <p class="verdict" id="verdict">Đang kiểm tra…</p>
+      </section>
 
-  <footer>Trang mẫu phía client — không xác minh chữ ký ở máy chủ.</footer>
-</div>
+      <section class="deck" id="deckGate">
+        <div class="deck__head">
+          <span class="mono deck__no">02</span>
+          <h2>Cửa khoang · Chrome passkey</h2>
+          <span class="mono deck__meta" id="gateMeta">CHƯA MỞ</span>
+        </div>
+        <p class="hint">Passkey được tạo và lưu trên chính thiết bị này (platform authenticator). Trang mẫu không có
+          máy chủ xác minh — credential id chỉ được lưu trong <span class="mono">localStorage</span> để minh hoạ luồng đăng nhập.</p>
+        <div class="actions">
+          <button class="btn btn--primary" id="btnRegister" type="button">Tạo passkey &amp; mở cửa</button>
+          <button class="btn" id="btnLogin" type="button">Mở bằng passkey đã lưu</button>
+          <button class="btn btn--ghost" id="btnReset" type="button">Xoá passkey trên máy</button>
+        </div>
+        <p class="msg" id="msg" role="status" aria-live="polite"></p>
+      </section>
 
-<script>
-(function () {
-  'use strict';
+      <section class="deck" id="deckBay">
+        <div class="deck__head">
+          <span class="mono deck__no">03</span>
+          <h2>Khoang làm việc</h2>
+          <span class="mono deck__meta" id="bayMeta">ĐANG KHOÁ</span>
+        </div>
 
-  var KEY_CRED = 'passkey-demo.credId';
-  var KEY_USER = 'passkey-demo.userId';
-  var RP_NAME = 'Hello World · Passkey Demo';
+        <div class="lockbay" id="lockbay">
+          <div class="lockbay__ring" aria-hidden="true"></div>
+          <p class="lockbay__title">Cửa khoang đang khoá</p>
+          <p class="lockbay__note">Bảng chọn ứng dụng và khung xem chỉ hiện ra sau khi xác thực passkey ở mục 02.</p>
+        </div>
 
-  var rowsEl = document.getElementById('rows');
-  var verdictEl = document.getElementById('verdict');
-  var msgEl = document.getElementById('msg');
-  var outEl = document.getElementById('out');
-  var metaEl = document.getElementById('meta');
-  var btnRegister = document.getElementById('btnRegister');
-  var btnLogin = document.getElementById('btnLogin');
-  var btnReset = document.getElementById('btnReset');
+        <div class="bay" id="bay" hidden>
+          <div class="dock">
+            <div class="dock__head">
+              <h3>Bảng chọn ứng dụng</h3>
+              <span class="mono dock__hint">← → chọn · Enter mở</span>
+            </div>
+            <canvas class="dock__canvas" id="dock" tabindex="0" role="listbox" aria-label="Bảng chọn ứng dụng"></canvas>
+          </div>
 
-  /* ---------- helpers ---------- */
+          <div class="urlbar">
+            <div class="urlbar__row">
+              <canvas class="urlbar__canvas" id="urlCanvas" aria-hidden="true"></canvas>
+              <button class="btn btn--sm" id="btnEdit" type="button">Sửa URL</button>
+            </div>
+            <div class="urlbar__edit" id="urlEdit" hidden>
+              <input class="input mono" id="urlInput" type="text" spellcheck="false" autocomplete="off" aria-label="URL của ứng dụng đang chọn" />
+              <button class="btn btn--primary btn--sm" id="btnSave" type="button">Lưu URL</button>
+              <button class="btn btn--ghost btn--sm" id="btnCancel" type="button">Huỷ</button>
+            </div>
+            <p class="msg msg--sm" id="urlMsg" role="status" aria-live="polite"></p>
+          </div>
 
-  function chip(text, tone) {
-    return '<span class="chip chip--' + tone + '">' + text + '</span>';
-  }
+          <div class="viewport" id="viewport">
+            <canvas class="viewport__shield" id="shield"></canvas>
+            <iframe class="viewport__frame" id="frame" title="Ứng dụng web đang xem" referrerpolicy="no-referrer"></iframe>
+            <div class="viewport__hud">
+              <span class="tag" id="viewName">—</span>
+              <span class="tag tag--guard mono" id="viewGuard">LỚP BẢO VỆ</span>
+              <span class="viewport__gap"></span>
+              <button class="btn btn--ghost btn--xs" id="btnWiden" type="button">Mở rộng</button>
+              <button class="btn btn--ghost btn--xs" id="btnReload" type="button">Tải lại</button>
+            </div>
+          </div>
+          <p class="note mono">Nhiều trang chặn nhúng (X-Frame-Options) — nếu khung trắng, hãy chọn ứng dụng khác hoặc sửa URL.</p>
+        </div>
+      </section>
+    </main>
 
-  function row(label, note, text, tone) {
-    return '<li><span class="label">' + label +
-      '<span class="who">' + note + '</span></span>' + chip(text, tone) + '</li>';
-  }
+    <footer class="footer">
+      <span class="mono footer__seal">NIÊM PHONG · BẢO VỆ PHÍA CLIENT</span>
+      <p>Trang mẫu chạy hoàn toàn ở phía client: chữ ký passkey không được máy chủ xác minh. Lớp bảo vệ chỉ cản trở
+        thao tác xem nguồn, chuột phải và sao chép — trình duyệt không cho phép chặn devtools tuyệt đối.</p>
+    </footer>
+  </div>
 
-  function b64url(buf) {
-    var bytes = new Uint8Array(buf);
-    var s = '';
-    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-
-  function fromB64url(text) {
-    var s = atob(text.replace(/-/g, '+').replace(/_/g, '/'));
-    var bytes = new Uint8Array(s.length);
-    for (var i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
-    return bytes;
-  }
-
-  function randomBytes(n) {
-    return crypto.getRandomValues(new Uint8Array(n));
-  }
-
-  function setMsg(text, kind) {
-    msgEl.textContent = text || '';
-    msgEl.className = 'msg' + (kind ? ' is-' + kind : '');
-  }
-
-  function userId() {
-    var id = localStorage.getItem(KEY_USER);
-    if (!id) {
-      id = b64url(randomBytes(16));
-      localStorage.setItem(KEY_USER, id);
-    }
-    return fromB64url(id);
-  }
-
-  function explain(err) {
-    var name = err && err.name ? err.name : 'Error';
-    var map = {
-      NotAllowedError: 'Yêu cầu bị từ chối hoặc hết thời gian chờ (bạn bấm huỷ, hoặc iframe/trang hiện tại bị chặn quyền dùng passkey).',
-      SecurityError: 'Bị chặn vì lý do an toàn: cần ngữ cảnh HTTPS và tên miền khớp với rp.id.',
-      InvalidStateError: 'Passkey cho tài khoản này đã tồn tại trên thiết bị.',
-      NotSupportedError: 'Thiết bị hoặc trình duyệt này không hỗ trợ passkey (platform authenticator).',
-      AbortError: 'Thao tác bị huỷ.',
-      TimeoutError: 'Hết thời gian chờ xác thực passkey.'
-    };
-    return (map[name] || 'Lỗi (' + name + '): ' + (err && err.message ? err.message : '')) + ' [' + name + ']';
-  }
-
-  /* ---------- phần 1: phát hiện môi trường ---------- */
-
-  var ua = navigator.userAgent;
-  var isChromeOS = /CrOS/i.test(ua);
-  var isChrome = /Chrome\//.test(ua) && !/(Edg|OPR|SamsungBrowser|YaBrowser)\//.test(ua);
-  var chromeApp = window.chrome && window.chrome.app && window.chrome.app.runtime;
-  var hasPasskey = typeof window.PublicKeyCredential !== 'undefined' && !!navigator.credentials;
-  var secure = window.isSecureContext !== false;
-
-  var html = '';
-  html += row('Hệ điều hành', 'navigator.userAgent · "CrOS"',
-    isChromeOS ? 'Chrome OS' : 'Không phải Chrome OS', isChromeOS ? 'ok' : 'warn');
-  html += row('Trình duyệt', 'navigator.userAgent · "Chrome/"',
-    isChrome ? 'Chrome' : 'Không phải Chrome', isChrome ? 'ok' : 'warn');
-  html += row('Ứng dụng Chrome', 'window.chrome.app.runtime',
-    chromeApp ? 'Chrome App' : 'Trang web thường', chromeApp ? 'ok' : 'warn');
-  html += row('Ngữ cảnh an toàn', 'window.isSecureContext', secure ? 'HTTPS' : 'Không an toàn', secure ? 'ok' : 'bad');
-  html += row('Passkey (WebAuthn)', 'window.PublicKeyCredential', hasPasskey ? 'Có hỗ trợ' : 'Không hỗ trợ', hasPasskey ? 'ok' : 'bad');
-  html += row('Passkey nền tảng', 'isUserVerifyingPlatformAuthenticatorAvailable()', 'Đang kiểm tra…', 'wait');
-  rowsEl.innerHTML = html;
-
-  var platformRow = rowsEl.querySelector('.chip--wait');
-  var platformName = '';
-
-  function paintVerdict() {
-    var missing = [];
-    if (!isChromeOS) missing.push('Chrome OS');
-    if (!isChrome) missing.push('Chrome');
-    if (!chromeApp) missing.push('ứng dụng Chrome');
-    var ready = missing.length === 0;
-    verdictEl.innerHTML = ready
-      ? '<b>Đúng môi trường mục tiêu:</b> đang chạy trong ứng dụng Chrome trên Chrome OS.'
-      : '<b>Chưa đúng môi trường mục tiêu.</b> Còn thiếu: ' + missing.join(', ') +
-        '. Kết quả này là bình thường khi mở trang trong tab Chrome thường, trên máy không phải Chrome OS, ' +
-        'hoặc trong iframe xem trước — luồng passkey bên dưới vẫn dùng được nếu trình duyệt hỗ trợ.';
-  }
-  paintVerdict();
-
-  if (hasPasskey && typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
-    window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(function (ok) {
-      platformName = ok ? 'passkey' : '';
-      if (platformRow) {
-        platformRow.innerHTML = chip(ok ? 'Sẵn sàng' : 'Không có', ok ? 'ok' : 'bad');
-      }
-    }).catch(function () {
-      if (platformRow) platformRow.innerHTML = chip('Không xác định', 'warn');
-    });
-  } else if (platformRow) {
-    platformRow.innerHTML = chip('Không có', 'bad');
-  }
-
-  /* ---------- phần 2: đăng nhập bằng passkey ---------- */
-
-  var supported = hasPasskey && secure;
-
-  if (!supported) {
-    btnRegister.disabled = true;
-    btnLogin.disabled = true;
-    setMsg(hasPasskey
-      ? 'Cần ngữ cảnh an toàn (HTTPS hoặc localhost) để dùng passkey.'
-      : 'Trình duyệt này không hỗ trợ WebAuthn/passkey.', 'bad');
-  }
-
-  function refreshButtons() {
-    var saved = localStorage.getItem(KEY_CRED);
-    btnLogin.disabled = !supported || !saved;
-    btnRegister.disabled = !supported;
-    btnReset.disabled = !saved && !localStorage.getItem(KEY_USER);
-  }
-  refreshButtons();
-
-  function unlock(credId, how) {
-    outEl.textContent = 'Hello World';
-    outEl.classList.add('unlocked');
-    metaEl.textContent = how + ' · credential ' + credId.slice(0, 16) + '… · ' + new Date().toLocaleString('vi-VN');
-    console.log('Hello World');
-  }
-
-  btnRegister.addEventListener('click', function () {
-    if (localStorage.getItem(KEY_CRED)) {
-      setMsg('Máy này đã có passkey cho trang. Hãy dùng "Đăng nhập bằng passkey đã lưu" hoặc xoá trước khi tạo mới.', 'bad');
-      return;
-    }
-    setMsg('Đang chờ bạn xác nhận passkey trên thiết bị…');
-
-    navigator.credentials.create({
-      publicKey: {
-        challenge: randomBytes(32),
-        rp: { id: location.hostname, name: RP_NAME },
-        user: { id: userId(), name: 'demo@chrome-os', displayName: 'Người dùng Chrome OS' },
-        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-        authenticatorSelection: {
-          authenticatorAttachment: 'platform',
-          residentKey: 'required',
-          requireResidentKey: true,
-          userVerification: 'required'
-        },
-        attestation: 'none',
-        timeout: 60000
-      }
-    }).then(function (cred) {
-      var id = b64url(cred.rawId);
-      localStorage.setItem(KEY_CRED, id);
-      setMsg('Đã tạo passkey và đăng nhập thành công.', 'ok');
-      unlock(id, 'Tạo passkey mới');
-      refreshButtons();
-    }).catch(function (err) {
-      setMsg(explain(err), 'bad');
-    });
-  });
-
-  btnLogin.addEventListener('click', function () {
-    var saved = localStorage.getItem(KEY_CRED);
-    if (!saved) {
-      setMsg('Chưa có passkey nào trên máy này — hãy tạo passkey trước.', 'bad');
-      return;
-    }
-    setMsg('Đang chờ bạn xác nhận passkey trên thiết bị…');
-
-    navigator.credentials.get({
-      publicKey: {
-        challenge: randomBytes(32),
-        rpId: location.hostname,
-        allowCredentials: [{ type: 'public-key', id: fromB64url(saved) }],
-        userVerification: 'required',
-        timeout: 60000
-      }
-    }).then(function (assertion) {
-      var id = b64url(assertion.rawId);
-      setMsg('Đăng nhập bằng passkey thành công.', 'ok');
-      unlock(id, 'Đăng nhập passkey');
-      refreshButtons();
-    }).catch(function (err) {
-      setMsg(explain(err), 'bad');
-    });
-  });
-
-  btnReset.addEventListener('click', function () {
-    localStorage.removeItem(KEY_CRED);
-    localStorage.removeItem(KEY_USER);
-    outEl.textContent = 'Chưa đăng nhập';
-    outEl.classList.remove('unlocked');
-    metaEl.textContent = 'Đăng nhập bằng passkey để in ra Hello World.';
-    setMsg('Đã xoá dấu vết trên máy này. Passkey trong hệ thống vẫn còn — xoá trong cài đặt Chrome nếu cần.');
-    refreshButtons();
-  });
-})();
-</script>
+  <div class="toast mono" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="app.js" defer></script>
 </body>
 </html>
