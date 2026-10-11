@@ -4,6 +4,18 @@ import { Buffer } from 'buffer'
 if (!window.Buffer) window.Buffer = Buffer
 if (!globalThis.Buffer) globalThis.Buffer = Buffer
 
+// @solana/errors (and web3.js) read `process.env.NODE_ENV` at module init, but
+// the browser has no `process`. Provide a minimal Node-style shim so importing
+// them doesn't throw "process is not defined" and blank the app.
+if (!(globalThis as { process?: unknown }).process) {
+  ;(globalThis as { process?: unknown }).process = {
+    env: { NODE_ENV: 'production' },
+    browser: true,
+    version: '',
+    versions: {},
+  }
+}
+
 // Keep the app feeling native on iOS/iPadOS: no pinch-zoom, no double-tap zoom.
 document.addEventListener(
   'gesturestart',

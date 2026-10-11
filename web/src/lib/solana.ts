@@ -208,8 +208,11 @@ export async function getUsdcBalance(
 
 export async function getSolBalance(rpcUrl: string, owner: string): Promise<number> {
   try {
-    const lamports = await rpcFetch<number>(rpcUrl, 'getBalance', [owner])
-    return lamportsToSol(lamports || 0)
+    const result = await rpcFetch<number | { value?: number }>(rpcUrl, 'getBalance', [owner])
+    // Cloud Chain's node wraps the lamport count in the standard
+    // `{ context, value }` envelope instead of returning a bare number.
+    const lamports = typeof result === 'number' ? result : Number(result?.value)
+    return Number.isFinite(lamports) ? lamportsToSol(lamports) : 0
   } catch {
     return 0
   }

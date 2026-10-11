@@ -26,6 +26,14 @@ Verify with `docker compose -f docker-compose.base44.yml ps` and `curl -s localh
   to whatever origin the app is served from.
 - **All RPC traffic goes through `/api/rpc`** with the endpoint in the `x-rpc-url` header. This keeps
   a user-configured node from being blocked by CORS, and lets Settings swap the RPC at runtime.
+- **Cloud Chain wraps some RPC results.** `getBalance` returns the standard `{ context, value }`
+  envelope instead of a bare lamport count, so balance helpers must unwrap `value` before converting
+  to SOL (`getSolBalance` in `web/src/lib/solana.ts`). Feeding the raw object into `lamportsToSol`
+  renders `NaN SOL` on Home.
+- **The browser needs a Node shim.** `@solana/errors` reads `process.env.NODE_ENV` at module init, and
+  `@solana/web3.js` expects a `Buffer`. Both are provided in `web/src/polyfill.ts`, which must stay
+  the first import in `web/src/main.tsx` — without the `process` shim the app throws
+  "process is not defined" and `#root` stays empty.
 - **Realtime notifications** arrive over `/ws` (Vite proxies it to the API). The server polls
   `getSignaturesForAddress` for every subscribed address and pushes new signatures; the client then
   reads the transaction itself to ring + show the system notification. The client also diffs its own
