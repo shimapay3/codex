@@ -1,0 +1,33 @@
+name: secure-pay-address
+
+# App thuần phía trình duyệt: một dev server Vite duy nhất, không backend.
+# Điểm vào cho người dùng là cổng 3000 -> 5173 trong container.
+
+services:
+  web:
+    image: node:22-alpine
+    working_dir: /app/web
+    command: ["sh", "-ec", "npm install --no-audit --no-fund --prefer-offline && exec npm run dev"]
+    environment:
+      NODE_ENV: development
+      # Chuyển từ môi trường sandbox vào container (rỗng thì bỏ qua).
+      BASE44_PREVIEW_MODE:
+      BASE44_SANDBOX_HOST_DOMAIN:
+      BASE44_PUBLIC_HOST_SUFFIX:
+      __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS:
+    volumes:
+      - ./web:/app/web
+      - web_node_modules:/app/web/node_modules
+    ports:
+      - "3000:5173"
+    restart: on-failure
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -q -T 3 -O /dev/null http://127.0.0.1:5173/ || (echo 'web: vite chua phuc vu trang'; exit 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  web_node_modules:
