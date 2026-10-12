@@ -16,7 +16,7 @@ import { USDC_AVATAR, USDC_MINT } from '../lib/solana'
 type Step = 'welcome' | 'method' | 'import' | 'restore' | 'secure'
 
 export default function Onboarding() {
-  const { createWallet, restoreFromCloud, enablePasskey, setPin, wallets, pushToast } = useWallet()
+  const { createWallet, restoreFromCloud, enablePasskey, setPin, wallets, pushToast, completeOnboarding } = useWallet()
   const [step, setStep] = useState<Step>('welcome')
   const [secret, setSecret] = useState('')
   const [busy, setBusy] = useState(false)
@@ -279,12 +279,20 @@ export default function Onboarding() {
                 {error}
               </p>
             )}
+
+            <button
+              type="button"
+              onClick={() => completeOnboarding()}
+              className="w-full rounded-2xl py-3 text-[13px] font-semibold text-[color:var(--muted)] transition hover:text-[color:var(--accent)]"
+            >
+              Bỏ qua — tôi sẽ tự lưu khoá bí mật
+            </button>
           </div>
         )}
       </div>
 
       <p className="mt-4 text-center text-[12.5px] font-semibold text-[color:var(--muted)]">
-        {wallets.length ? 'Ví đã sẵn sàng — đang mở…' : 'Hãy tạo hoặc nhập một ví để tiếp tục'}
+        {wallets.length ? 'Đã tạo ví — bảo vệ khoá hoặc bỏ qua để tiếp tục' : 'Hãy tạo hoặc nhập một ví để tiếp tục'}
       </p>
     </div>
   )

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from 'recharts'
-import { TrendingUp } from 'lucide-react'
+import { Loader2, TrendingUp } from 'lucide-react'
 import { BalanceSample } from '../state/vault'
 import { useWallet } from '../state/WalletProvider'
 import { formatAmount } from '../lib/solana'
@@ -45,6 +45,7 @@ export default function BalanceChart({ height = 132 }: { height?: number }) {
   const padding = Math.max((max - min) * 0.25, 0.5)
 
   const rising = values[values.length - 1] >= values[0]
+  const hasData = samples.length > 0 || balance.usdc > 0
 
   return (
     <div className="relative">
@@ -62,34 +63,45 @@ export default function BalanceChart({ height = 132 }: { height?: number }) {
           {rising ? '▲' : '▼'} realtime
         </span>
       </div>
-      <div style={{ height }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
-            <defs>
-              <linearGradient id="balance-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.55} />
-                <stop offset="100%" stopColor="var(--accent)" stopOpacity={0.02} />
-              </linearGradient>
-              <linearGradient id="balance-stroke" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="var(--accent)" />
-                <stop offset="100%" stopColor="var(--accent-2)" />
-              </linearGradient>
-            </defs>
-            <YAxis hide domain={[Math.max(0, min - padding), max + padding]} />
-            <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--border)' }} />
-            <Area
-              type="monotone"
-              dataKey="amount"
-              stroke="url(#balance-stroke)"
-              strokeWidth={2.4}
-              fill="url(#balance-fill)"
-              isAnimationActive={false}
-              dot={false}
-              activeDot={{ r: 4, strokeWidth: 0, fill: 'var(--accent-2)' }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+      {balance.loading && !hasData ? (
+        <div style={{ height }} className="flex items-center justify-center">
+          <Loader2 size={20} className="animate-spin text-[color:var(--muted)]" />
+        </div>
+      ) : !hasData ? (
+        <div style={{ height }} className="flex flex-col items-center justify-center gap-1.5 text-center">
+          <p className="text-[12px] text-[color:var(--muted)]">Chưa có dữ liệu số dư</p>
+          <p className="text-[10.5px] text-[color:var(--muted)] opacity-70">Đang chờ kết nối RPC…</p>
+        </div>
+      ) : (
+        <div style={{ height }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="balance-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.55} />
+                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0.02} />
+                </linearGradient>
+                <linearGradient id="balance-stroke" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="var(--accent)" />
+                  <stop offset="100%" stopColor="var(--accent-2)" />
+                </linearGradient>
+              </defs>
+              <YAxis hide domain={[Math.max(0, min - padding), max + padding]} />
+              <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--border)' }} />
+              <Area
+                type="monotone"
+                dataKey="amount"
+                stroke="url(#balance-stroke)"
+                strokeWidth={2.4}
+                fill="url(#balance-fill)"
+                isAnimationActive={false}
+                dot={false}
+                activeDot={{ r: 4, strokeWidth: 0, fill: 'var(--accent-2)' }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   )
 }

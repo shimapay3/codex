@@ -142,6 +142,7 @@ type WalletContextValue = {
   setPin: (pin: string) => Promise<void>
   clearPin: () => Promise<void>
   lock: () => void
+  completeOnboarding: () => void
   extendAutoLock: () => void
   backupNow: () => Promise<void>
   restoreFromCloud: (input: string) => Promise<number>
@@ -159,7 +160,9 @@ export function useWallet() {
 }
 
 function loadPrefsMirror(): Prefs {
-  return { ...DEFAULT_PREFS, ...readLocal<Partial<Prefs>>(StorageKeys.prefs, {}) }
+  const prefs = { ...DEFAULT_PREFS, ...readLocal<Partial<Prefs>>(StorageKeys.prefs, {}) }
+  if (prefs.rpcUrl === 'https://rpc.dolaxanh.com') prefs.rpcUrl = DEFAULT_RPC_URL
+  return prefs
 }
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
@@ -401,7 +404,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         vaultKeyRef.current = vaultKey
         setVault(data)
         vaultRef.current = data
-        setSession('unlocked')
+        // Stay in 'onboarding' so the secure step is shown.
         return wallet
       }
 
@@ -655,6 +658,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setSession('locked')
   }, [])
 
+  const completeOnboarding = useCallback(() => {
+    setSession('unlocked')
+  }, [])
+
   const { secondsLeft, extend, lockNow } = useAutoLock({
     enabled: session === 'unlocked',
     minutes: prefs.autoLockMinutes,
@@ -734,7 +741,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       vaultKeyRef.current = vaultKey
       setVault(data)
       vaultRef.current = data
-      setSession('unlocked')
+      // Stay in 'onboarding' so the secure step is shown.
       seenRef.current = new Set()
       pushToast({
         tone: 'success',
@@ -771,6 +778,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     primeAudio()
     const label = `Cloud Pay · ${(vaultRef.current?.wallets[0]?.name || 'Ví')}`
     const { record, prfBytes } = await registerPasskey(label)
+
+    if (!prfBytes && !loadPinWrap()) {
+      throw new Error('Thiết bị không hỗ trợ PRF. Vui lòng đặt mã PIN trước khi bật Passkey.')
+    }
+
     writeLocal(StorageKeys.passkey, record)
     setPasskeyRecord(record)
 
@@ -783,12 +795,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setStore(updated)
       pushToast({ tone: 'success', title: 'Đã bật Passkey', body: 'Bảo vệ bằng khoá phần cứng (PRF)' })
     } else {
-      // No PRF: the vault key stays behind a mandatory PIN released only after a
-      // successful Passkey assertion.
       pushToast({
         tone: 'info',
         title: 'Passkey đã bật',
-        body: 'Thiết bị không hỗ trợ PRF — hãy đặt mã PIN để mở khoá nhanh',
+        body: 'Mở khoá bằng Passkey + mã PIN',
       })
     }
     ringSuccess()
@@ -945,6 +955,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setPin,
     clearPin,
     lock,
+    completeOnboarding,
     extendAutoLock: extend,
     backupNow,
     restoreFromCloud,
