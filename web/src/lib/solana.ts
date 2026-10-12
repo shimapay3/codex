@@ -31,9 +31,11 @@ export const USDC_AVATAR =
 export const DEFAULT_RPC_URL = 'https://rpc.localusd.cloud'
 export const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
 
-export const EXPLORER_BASE = 'https://explorer.solana.com'
+export const EXPLORER_BASE = 'https://explorer.dolaxanh.com'
 export const SOL_ICON = 'https://explorer.solana.com/icon-144.png'
+export const EXPLORER_CUSTOM_URL = 'https://localusd.cloud/'
 export const USDC_DECIMALS_FALLBACK = 6
+export const MAX_WALLETS = 5
 
 /** Every RPC call goes through our own API so CORS never blocks a custom node. */
 export async function rpcFetch<T = any>(
@@ -367,14 +369,53 @@ function decodeMemoFromRaw(instruction: any): string | null {
   }
 }
 
-export function explorerTxUrl(signature: string, rpcUrl: string): string {
-  const params = new URLSearchParams({ cluster: 'custom', customUrl: rpcUrl })
+/**
+ * Explorer URLs always use the fixed Cloud Chain customUrl (localusd.cloud).
+ * The rpcUrl parameter is kept for API compatibility but the customUrl is
+ * hardcoded — explorer.dolaxanh.com returns empty results without it.
+ */
+export function explorerTxUrl(signature: string, _rpcUrl?: string): string {
+  const params = new URLSearchParams({ cluster: 'custom', customUrl: EXPLORER_CUSTOM_URL })
   return `${EXPLORER_BASE}/tx/${signature}?${params.toString()}`
 }
 
-export function explorerAddressUrl(address: string, rpcUrl: string): string {
-  const params = new URLSearchParams({ cluster: 'custom', customUrl: rpcUrl })
+export function explorerAddressUrl(address: string, _rpcUrl?: string): string {
+  const params = new URLSearchParams({ cluster: 'custom', customUrl: EXPLORER_CUSTOM_URL })
   return `${EXPLORER_BASE}/address/${address}?${params.toString()}`
+}
+
+// --- Server-side wallet limit enforcement ----------------------------------
+// Each device is limited to MAX_WALLETS wallets. The server tracks wallet
+// addresses per device ID and rejects creation beyond the limit.
+
+export type WalletCountInfo = { count: number; limit: number; canCreate: boolean }
+
+export async function getWalletCount(deviceId: string): Promise<WalletCountInfo> {
+  try {
+    const res = await fetch(`/api/wallet/count/${encodeURIComponent(deviceId)}`)
+    const json = await res.json()
+    return {
+      count: Number(json.count) || 0,
+      limit: Number(json.limit) || MAX_WALLETS,
+      canCreate: json.canCreate !== false,
+    }
+  } catch {
+    // If the server is unreachable, allow creation (client-side limit still applies)
+    return { count: 0, limit: MAX_WALLETS, canCreate: true }
+  }
+}
+
+export async function registerWalletWithServer(deviceId: string, address: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/wallet/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ deviceId, address }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
 }
 
 function extractMemo(tx: any): string {

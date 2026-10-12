@@ -33,4 +33,16 @@ export const StorageKeys = {
   pinEnabled: 'pinEnabled.v1',
   prefs: 'prefs.v1',
   localData: 'localdata.v1',
+  deviceId: 'device.v1',
+  pinAttempts: 'pinAttempts.v1',
 } as const
+
+/** Generate or retrieve a stable per-device identifier for server-side wallet limits. */
+export function getOrCreateDeviceId(): string {
+  let id = readLocal<string>(StorageKeys.deviceId, '')
+  if (!id) {
+    id = `dev-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+    writeLocal(StorageKeys.deviceId, id)
+  }
+  return id
+}

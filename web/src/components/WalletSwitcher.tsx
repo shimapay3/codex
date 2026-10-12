@@ -3,6 +3,7 @@ import { ChevronDown, Copy, Plus, RefreshCw, Trash2, Wallet, X } from 'lucide-re
 import { useWallet } from '../state/WalletProvider'
 import { copyToClipboard } from '../lib/format'
 import { shortAddress } from '../lib/crypto'
+import { MAX_WALLETS } from '../lib/solana'
 
 type Props = { open: boolean; onClose: () => void }
 
@@ -213,21 +214,25 @@ export default function WalletSwitcher({ open, onClose }: Props) {
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 type="button"
+                disabled={wallets.length >= MAX_WALLETS}
                 onClick={() => setMode('create')}
-                className="flex items-center justify-center gap-2 rounded-2xl accent-gradient px-4 py-3 text-[13px] font-semibold text-white shadow-glow"
+                className="flex items-center justify-center gap-2 rounded-2xl accent-gradient px-4 py-3 text-[13px] font-semibold text-white shadow-glow disabled:opacity-40"
               >
                 <Plus size={16} /> Tạo ví mới
               </button>
               <button
                 type="button"
+                disabled={wallets.length >= MAX_WALLETS}
                 onClick={() => setMode('import')}
-                className="flex items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] px-4 py-3 text-[13px] font-semibold"
+                className="flex items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] px-4 py-3 text-[13px] font-semibold disabled:opacity-40"
               >
                 <Wallet size={16} /> Nhập ví
               </button>
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-[color:var(--muted)]">
-              Chuyển đổi giữa các ví tức thì — mỗi ví có địa chỉ, lịch sử và số dư riêng.
+              {wallets.length >= MAX_WALLETS
+                ? `Đã đạt giới hạn ${MAX_WALLETS} ví cho thiết bị này. Xoá bớt ví để tạo mới.`
+                : `Chuyển đổi giữa các ví tức thì — mỗi ví có địa chỉ, lịch sử và số dư riêng. (${wallets.length}/${MAX_WALLETS})`}
             </p>
           </>
         )}

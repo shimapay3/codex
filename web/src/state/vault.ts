@@ -220,3 +220,39 @@ export function savePinWrap(wrap: PinWrap | null) {
 export function b64ToBytesSafe(value: string) {
   return b64ToBytes(value)
 }
+
+// --- PIN attempt rate limiting ----------------------------------------------
+// Prevents brute-forcing the 6-digit PIN by locking out after repeated failures.
+// State is stored in localStorage; a determined attacker can clear it, but the
+// server-side wallet limit and passkey requirement are the primary defenses.
+
+export type PinAttempts = { count: number; lockedUntil: number; lastAttempt: number }
+
+export function loadPinAttempts(): PinAttempts {
+  return readLocal<PinAttempts>(StorageKeys.pinAttempts, { count: 0, lockedUntil: 0, lastAttempt: 0 })
+}
+
+export function savePinAttempts(attempts: PinAttempts) {
+  writeLocal(StorageKeys.pinAttempts, attempts)
+}
+
+export function getPinLockoutRemaining(): number {
+  const attempts = loadPinAttempts()
+  if (!attempts.lockedUntil) return 0
+  return Math.max(0, attempts.lockedUntil - Date.now())
+}
+
+export function recordPinFailure(): { locked: boolean; remainingMs: number } {
+  const attempts = loadPinAttempts()
+  const count = attempts.count + 1
+  let lockedUntil = 0
+  if (count >= 10) lockedUntil = Date.now() + 30 * 60 * 1000   // 30 minutes
+  else if (count >= 5) lockedUntil = Date.now() + 5 * 60 * 1000  // 5 minutes
+  else if (count >= 3) lockedUntil = Date.now() + 30 * 1000      // 30 seconds
+  savePinAttempts({ count, lockedUntil, lastAttempt: Date.now() })
+  return { locked: lockedUntil > 0, remainingMs: lockedUntil > 0 ? lockedUntil - Date.now() : 0 }
+}
+
+export function resetPinAttempts() {
+  savePinAttempts({ count: 0, lockedUntil: 0, lastAttempt: 0 })
+}

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ExternalLink, Loader2, RefreshCw, Search } from 'lucide-react'
 import { useWallet } from '../state/WalletProvider'
-import { EXPLORER_BASE, explorerAddressUrl, explorerTxUrl } from '../lib/solana'
+import { EXPLORER_BASE, EXPLORER_CUSTOM_URL, explorerAddressUrl, explorerTxUrl } from '../lib/solana'
 import { isValidAddress } from '../lib/crypto'
 import { shortAddress } from '../lib/crypto'
 
@@ -25,7 +25,7 @@ export default function ExplorerFrame({ initialQuery = '' }: Props) {
     if (value.length > 60) return explorerTxUrl(value, rpcUrl)
     if (isValidAddress(value)) return explorerAddressUrl(value, rpcUrl)
     if (activeWallet?.address) return explorerAddressUrl(activeWallet.address, rpcUrl)
-    return `${EXPLORER_BASE}/?cluster=custom&customUrl=${encodeURIComponent(rpcUrl)}`
+    return `${EXPLORER_BASE}/?cluster=custom&customUrl=${encodeURIComponent(EXPLORER_CUSTOM_URL)}`
   }, [query, rpcUrl, activeWallet?.address])
 
   return (

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import Logo from './Logo'
 import { useWallet } from '../state/WalletProvider'
-import { USDC_AVATAR, USDC_MINT } from '../lib/solana'
+import { USDC_AVATAR, USDC_MINT, MAX_WALLETS } from '../lib/solana'
 
 type Step = 'welcome' | 'method' | 'import' | 'restore' | 'secure'
 
@@ -152,6 +152,10 @@ export default function Onboarding() {
                 {error}
               </p>
             )}
+
+            <p className="text-center text-[10.5px] leading-relaxed text-[color:var(--muted)]">
+              Giới hạn {MAX_WALLETS} ví cho mỗi thiết bị · Cloud Chain
+            </p>
           </div>
         )}
 

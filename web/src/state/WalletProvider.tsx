@@ -30,6 +30,9 @@ import {
   fetchAirdropStatus,
   sendUsdc,
   USDC_DECIMALS_FALLBACK,
+  MAX_WALLETS,
+  getWalletCount,
+  registerWalletWithServer,
 } from '../lib/solana'
 import {
   primeAudio,
@@ -41,7 +44,7 @@ import {
   vibrate,
 } from '../lib/notify'
 import { applyTheme } from '../lib/theme'
-import { readLocal, writeLocal, removeLocal, StorageKeys } from '../lib/storage'
+import { readLocal, writeLocal, removeLocal, StorageKeys, getOrCreateDeviceId } from '../lib/storage'
 import { downloadBackup, uploadBackup } from '../lib/cloud'
 import { useRealtime, PaymentEvent } from './useRealtime'
 import { useAutoLock } from './useAutoLock'
@@ -68,6 +71,9 @@ import {
   toIndex,
   unwrapVaultKeyWithSecret,
   setPinWrap,
+  getPinLockoutRemaining,
+  recordPinFailure,
+  resetPinAttempts,
 } from './vault'
 import { hkdf, importAesKey, unwrapKey } from '../lib/crypto'
 
@@ -316,14 +322,26 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const unlockWithPin = useCallback(
     async (pin: string) => {
+      // Rate-limit PIN attempts to prevent brute-forcing the 6-digit code.
+      const lockoutMs = getPinLockoutRemaining()
+      if (lockoutMs > 0) {
+        const seconds = Math.ceil(lockoutMs / 1000)
+        throw new Error(`PIN bị khoá, thử lại sau ${seconds} giây`)
+      }
       const wrap = loadPinWrap()
       if (!wrap) throw new Error('Chưa thiết lập mã PIN')
       try {
         const vaultKey = await openPinWrap(pin, wrap)
         await unlockWithData(vaultKey)
         ringSuccess()
+        resetPinAttempts()
       } catch {
         ringError()
+        const result = recordPinFailure()
+        if (result.locked) {
+          const seconds = Math.ceil(result.remainingMs / 1000)
+          throw new Error(`Mã PIN không đúng. PIN bị khoá ${seconds} giây.`)
+        }
         throw new Error('Mã PIN không đúng')
       }
     },
@@ -357,6 +375,16 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const currentKey = vaultKeyRef.current
       if (!currentVault || !currentKey) throw new Error('Ví đang bị khoá')
 
+      // Enforce wallet limit: max MAX_WALLETS per device (client + server).
+      if (currentVault.wallets.length >= MAX_WALLETS) {
+        throw new Error(`Đã đạt giới hạn ${MAX_WALLETS} ví cho thiết bị này`)
+      }
+      const deviceId = getOrCreateDeviceId()
+      const info = await getWalletCount(deviceId)
+      if (!info.canCreate) {
+        throw new Error(`Đã đạt giới hạn ${MAX_WALLETS} ví cho thiết bị này`)
+      }
+
       const wallet: WalletRecord = {
         id: `w-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name: name || `Ví ${currentVault.wallets.length + 1}`,
@@ -384,6 +412,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         activeWalletId: wallet.id,
       }
       await persist(next)
+      // Register with server for limit enforcement (fire-and-forget).
+      void registerWalletWithServer(deviceId, wallet.address)
       return wallet
     },
     [persist],
@@ -396,6 +426,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
       // First wallet of a brand new install: bootstrap the encrypted vault.
       if (!currentVault || !currentKey) {
+        // Check server-side wallet limit before creating the first wallet.
+        const deviceId = getOrCreateDeviceId()
+        const info = await getWalletCount(deviceId)
+        if (!info.canCreate) {
+          throw new Error(`Đã đạt giới hạn ${MAX_WALLETS} ví cho thiết bị này`)
+        }
+
         const generated = Keypair.generate()
         const result: ImportResult = input?.trim()
           ? await importSecret(input)
@@ -422,6 +459,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         vaultKeyRef.current = vaultKey
         setVault(data)
         vaultRef.current = data
+        // Register with server for limit enforcement (fire-and-forget).
+        void registerWalletWithServer(deviceId, wallet.address)
         // Stay in 'onboarding' so the secure step is shown.
         return wallet
       }
@@ -805,6 +844,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const vaultKey = newVaultKey()
       const wallets = (payload.wallets || []) as WalletRecord[]
       if (!wallets.length) throw new Error('Bản sao lưu không có ví nào')
+      if (wallets.length > MAX_WALLETS) {
+        throw new Error(`Bản sao lưu có ${wallets.length} ví, vượt giới hạn ${MAX_WALLETS} ví`)
+      }
 
       const data = emptyVault(loadPrefsMirror())
       data.wallets = wallets
@@ -826,6 +868,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       vaultKeyRef.current = vaultKey
       setVault(data)
       vaultRef.current = data
+      // Register all restored wallets with server for limit enforcement.
+      const restoreDeviceId = getOrCreateDeviceId()
+      for (const w of wallets) {
+        void registerWalletWithServer(restoreDeviceId, w.address)
+      }
       // Stay in 'onboarding' so the secure step is shown.
       seenRef.current = new Set()
       pushToast({
@@ -908,12 +955,18 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const key = vaultKeyRef.current
       if (!key) throw new Error('Ví đang bị khoá')
       if (!/^\d{6}$/.test(pin)) throw new Error('Mã PIN phải gồm 6 chữ số')
+      // PIN is a fallback for Passkey — require a Passkey to be enrolled first.
+      const record = passkeyRecord || readLocal<PasskeyRecord | null>(StorageKeys.passkey, null)
+      if (!record) {
+        throw new Error('Vui lòng thiết lập Passkey trước khi đặt mã PIN')
+      }
       const wrap = await setPinWrap(pin, key)
       savePinWrap(wrap)
       setPinEnabled(true)
+      resetPinAttempts()
       pushToast({ tone: 'success', title: 'Đã thiết lập mã PIN' })
     },
-    [pushToast],
+    [passkeyRecord, pushToast],
   )
 
   const clearPin = useCallback(async () => {

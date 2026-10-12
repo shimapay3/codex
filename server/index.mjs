@@ -37,6 +37,73 @@ app.post('/api/airdrop/init', handleAirdropInit)
 app.get('/api/airdrop/status/:address', handleAirdropStatus)
 app.get('/api/airdrop/info', handleAirdropInfo)
 
+// --- Wallet creation limit (max 5 per device) -------------------------------
+// Each device is identified by a client-generated ID stored in localStorage.
+// The server tracks wallet addresses per device and rejects creation beyond
+// the limit. IP is recorded as a secondary identifier for abuse detection.
+
+const MAX_WALLETS_PER_DEVICE = 5
+
+function getWalletState() {
+  const state = getState()
+  if (!state.wallets) state.wallets = { devices: {} }
+  if (!state.wallets.devices) state.wallets.devices = {}
+  return state.wallets
+}
+
+app.get('/api/wallet/count/:deviceId', (req, res) => {
+  const deviceId = req.params.deviceId
+  if (!deviceId || typeof deviceId !== 'string' || deviceId.length > 200) {
+    res.status(400).json({ error: 'Device ID không hợp lệ' })
+    return
+  }
+  const ws = getWalletState()
+  const device = ws.devices[deviceId]
+  const count = Array.isArray(device?.addresses) ? device.addresses.length : 0
+  res.json({ count, limit: MAX_WALLETS_PER_DEVICE, canCreate: count < MAX_WALLETS_PER_DEVICE })
+})
+
+app.post('/api/wallet/register', (req, res) => {
+  const { deviceId, address } = req.body || {}
+  if (!deviceId || typeof deviceId !== 'string' || deviceId.length > 200) {
+    res.status(400).json({ error: 'Device ID không hợp lệ' })
+    return
+  }
+  const addr = normalizeAddress(address)
+  if (!addr) {
+    res.status(400).json({ error: 'Địa chỉ ví không hợp lệ' })
+    return
+  }
+
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown'
+  const ws = getWalletState()
+
+  if (!ws.devices[deviceId]) {
+    ws.devices[deviceId] = { addresses: [], createdAt: Date.now(), ip }
+  }
+  const device = ws.devices[deviceId]
+
+  if (!device.addresses.includes(addr)) {
+    if (device.addresses.length >= MAX_WALLETS_PER_DEVICE) {
+      res.status(403).json({
+        error: `Đã đạt giới hạn ${MAX_WALLETS_PER_DEVICE} ví cho thiết bị này`,
+        count: device.addresses.length,
+        limit: MAX_WALLETS_PER_DEVICE,
+        canCreate: false,
+      })
+      return
+    }
+    device.addresses.push(addr)
+    save()
+  }
+
+  res.json({
+    count: device.addresses.length,
+    limit: MAX_WALLETS_PER_DEVICE,
+    canCreate: device.addresses.length < MAX_WALLETS_PER_DEVICE,
+  })
+})
+
 function coerceNumber(value) {
   const n = typeof value === 'string' ? Number.parseFloat(value) : value
   return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : null
