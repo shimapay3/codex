@@ -41,7 +41,7 @@ Verify with `docker compose -f docker-compose.base44.yml ps` and `curl -s localh
 - **Backups are stored server-side but are unreadable**: the payload is sealed with a key derived
   from the *first* wallet's secret (HKDF), and addressed by that wallet's public key. Restoring on a
   new device needs only that secret. Data lives in the `api_data` volume as JSON at `/data`.
-- **Only USDC is supported** (`USDKUXpVTWcJeu9euajKNMVjDXbrBWc5fhrPKAUyf4u`). Transfers add a
+- **Only USDC is supported** (`USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2`). Transfers add a
   `spl-memo` instruction so the note is visible on-chain, and open the recipient's associated token
   account when it does not exist yet (the sender pays the small rent).
 - **USDC price** is fixed at 1 USD / 30,000 VND unless a price endpoint is configured in Settings

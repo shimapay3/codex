@@ -14,7 +14,7 @@ import {
 import bs58 from 'bs58'
 
 /** Cloud Chain USDC token — the single supported asset of Cloud Pay Wallet. */
-export const USDC_MINT = 'USDKUXpVTWcJeu9euajKNMVjDXbrBWc5fhrPKAUyf4u'
+export const USDC_MINT = 'USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2'
 export const USDC_SYMBOL = 'USDC'
 export const USDC_NAME = 'USD Coin'
 
