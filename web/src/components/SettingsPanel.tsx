@@ -12,6 +12,7 @@ import {
   Radio,
   RotateCcw,
   ShieldAlert,
+  ShieldCheck,
   Trash2,
   Volume2,
 } from 'lucide-react'
@@ -354,6 +355,12 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
         title="Xuất khoá bí mật"
         hint="Tải khoá bí mật về máy để cất giữ thủ công. Không chia sẻ với bất kỳ ai — ai có khoá là có ví."
       >
+      <div className="flex items-start gap-2.5 rounded-2xl border border-[#14f195]/25 bg-[#14f195]/8 px-3.5 py-3 text-[11px] leading-relaxed text-[#14f195]">
+        <ShieldCheck size={14} className="mt-0.5 shrink-0" />
+        <span>
+          <b>100% keypair lưu cục bộ.</b> Mọi khoá bí mật (keypair, private key, passphrase) được sinh và mã hoá ngay trên thiết bị — không gửi lên máy chủ. Hãy chủ động tải file backup và cất nơi an toàn.
+        </span>
+      </div>
         {wallets.map((wallet) => (
           <div key={wallet.id} className="rounded-2xl border border-[color:var(--border)] p-3">
             <div className="flex items-center gap-2">
@@ -428,21 +435,23 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
         </button>
         {confirmReset && (
           <div className="space-y-2 rounded-2xl border border-[#ff6b81]/40 bg-[#ff6b81]/10 p-3">
-            <p className="text-[11.5px] text-[#ff8fa1]">
-              Toàn bộ ví, danh bạ và cài đặt trên thiết bị này sẽ bị xoá. Bản sao lưu đám mây vẫn giữ nguyên.
+            <p className="text-[11.5px] leading-relaxed text-[#ff8fa1]">
+              Toàn bộ cài đặt, PIN và danh bạ trên thiết bị sẽ bị xoá.
+              <b className="block mt-1">⚠ Khoá bí mật (keypair/private key) sẽ được GIỮ LẠI trong localStorage</b> — bạn vẫn có thể mở ví bằng khoá bí mật. Hãy chắc chắn đã backup khoá trước khi xoá PIN.
             </p>
             <button
               type="button"
               onClick={() => {
-                removeLocal('vault.v1')
                 removeLocal('pin.v1')
                 removeLocal('pinEnabled.v1')
+                removeLocal('pinAttempts.v1')
                 removeLocal('localdata.v1')
+                removeLocal('prefs.v1')
                 window.location.assign('/')
               }}
               className="w-full rounded-2xl bg-[#ff6b81] py-3 text-[13px] font-semibold text-white"
             >
-              Tôi hiểu — xoá ngay
+              Tôi hiểu — xoá cài đặt
             </button>
           </div>
         )}

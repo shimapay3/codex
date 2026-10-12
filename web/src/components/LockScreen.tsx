@@ -6,8 +6,10 @@ import {
   Lock,
   ShieldCheck,
   Wallet,
+  AlertTriangle,
 } from 'lucide-react'
 import Logo from './Logo'
+import SecretUpload from './SecretUpload'
 import { useWallet } from '../state/WalletProvider'
 import { shortAddress } from '../lib/crypto'
 import { loadStore } from '../state/vault'
@@ -208,6 +210,13 @@ export default function LockScreen() {
               Chấp nhận mảng JSON nhị phân, base58, private key hex, cụm 12/24 từ
               hoặc passphrase tự do.
             </p>
+            <SecretUpload onLoad={setSecret} />
+            <div className="flex items-start gap-2.5 rounded-2xl border border-[#f0ad4e]/30 bg-[#f0ad4e]/10 px-3.5 py-3 text-[11px] leading-relaxed text-[#f0ad4e]">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>
+                <b>⚠ Nhớ backup khoá bí mật!</b> Keypair & private key lưu 100% cục bộ trên thiết bị. Nếu mất khoá và không có file backup, ví không thể khôi phục.
+              </span>
+            </div>
             {error && (
               <p className="rounded-2xl border border-[#ff6b81]/40 bg-[#ff6b81]/10 px-3.5 py-3 text-[12px] text-[#ff8fa1]">
                 {error}

@@ -10,8 +10,10 @@ import {
   Copy,
   Check,
   AlertTriangle,
+  Upload,
 } from 'lucide-react'
 import Logo from './Logo'
+import SecretUpload from './SecretUpload'
 import { useWallet } from '../state/WalletProvider'
 import { USDC_AVATAR, USDC_MINT, MAX_WALLETS, getSolBalance, DEFAULT_RPC_URL } from '../lib/solana'
 import {
@@ -138,7 +140,7 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
                 { icon: <Wallet size={16} />, text: 'Nhiều ví, chuyển đổi tức thì' },
                 { icon: <ShieldCheck size={16} />, text: inTelegram ? 'Bảo mật bằng Telegram + mã PIN' : 'Nhập ví bằng khoá bí mật' },
                 { icon: <Sparkles size={16} />, text: 'MEMO đẹp, danh mục màu, lời chúc' },
-                ...(inTelegram ? [{ icon: <CloudDownload size={16} />, text: 'Khôi phục ví bằng Telegram ID' }] : []),
+                ...(inTelegram ? [{ icon: <Download size={16} />, text: 'Khôi phục ví bằng Telegram ID' }] : []),
               ].map((item) => (
                 <li key={item.text} className="flex items-center gap-3 text-[13px]">
                   <span className="flex h-8 w-8 items-center justify-center rounded-xl accent-gradient text-white">
@@ -231,6 +233,18 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
               <p className="mt-2 text-[11px] leading-relaxed text-[color:var(--muted)]">
                 Hỗ trợ mảng JSON nhị phân (secretKey), base58, private key hex, cụm 12/24 từ BIP39 và passphrase tự do.
               </p>
+              <div className="mt-2.5">
+                <SecretUpload onLoad={setSecret} />
+              </div>
+            </div>
+
+            {/* Backup reminder */}
+            <div className="flex items-start gap-2.5 rounded-2xl border border-[#f0ad4e]/30 bg-[#f0ad4e]/10 px-3.5 py-3 text-[11px] leading-relaxed text-[#f0ad4e]">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>
+                <b>⚠ Chủ động backup khoá bí mật!</b> Keypair, passphrase và private key được lưu 100% trên thiết bị của bạn (localStorage).
+                Hãy tải file khoá và cất nơi an toàn — nếu mất, không ai có thể khôi phục ví.
+              </span>
             </div>
 
             {error && (
