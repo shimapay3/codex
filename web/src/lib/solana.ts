@@ -28,7 +28,7 @@ export const USDC_TOKEN_PROGRAM = TOKEN_2022_PROGRAM_ID
 export const USDC_AVATAR =
   'https://usdc.dolaxanh.com/a/ACg8ocJtRSV_No5FrhpG55lc3nUSspbIExRO0CVJIMLt4SXgiobyEoI5=s72-c-no'
 
-export const DEFAULT_RPC_URL = 'https://rpc.dolaxanh.com'
+export const DEFAULT_RPC_URL = 'https://rpc.localusd.cloud'
 export const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
 
 export const EXPLORER_BASE = 'https://explorer.solana.com'

@@ -1,7 +1,7 @@
 // JSON-RPC proxy. The browser talks to our API (same origin) so the wallet
 // works no matter what CORS policy the configured RPC endpoint uses, and the
 // endpoint itself stays swappable at runtime from the app's Settings screen.
-export const DEFAULT_RPC = process.env.DEFAULT_RPC_URL || 'https://rpc.dolaxanh.com'
+export const DEFAULT_RPC = process.env.DEFAULT_RPC_URL || 'https://rpc.localusd.cloud'
 
 const MAX_BODY = 1024 * 512
 

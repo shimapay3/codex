@@ -308,7 +308,7 @@ export default function LockScreen() {
           : 'Khoá bí mật không bao giờ rời khỏi thiết bị này'}
       </p>
       <p className="mt-1 text-center text-[10px] text-[color:var(--muted)]">
-        Cloud Chain · rpc.dolaxanh.com
+        Cloud Chain · rpc.localusd.cloud
       </p>
     </div>
   )

@@ -13,7 +13,7 @@ services:
       - PORT=8000
       - DATA_DIR=/data
       - NODE_ENV=development
-      - DEFAULT_RPC_URL=${DEFAULT_RPC_URL:-https://rpc.dolaxanh.com}
+      - DEFAULT_RPC_URL=${DEFAULT_RPC_URL:-https://rpc.localusd.cloud}
       - PRICE_ENDPOINT=${PRICE_ENDPOINT:-}
       - WATCH_POLL_MS=${WATCH_POLL_MS:-12000}
     volumes:

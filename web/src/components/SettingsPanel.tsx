@@ -139,7 +139,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
 
   return (
     <div className="space-y-4">
-      <Section icon={<Radio size={15} />} title="Mạng & RPC" hint="Thay đổi endpoint Cloud Chain bất cứ lúc nào. Mặc định: rpc.dolaxanh.com.">
+      <Section icon={<Radio size={15} />} title="Mạng & RPC" hint="Thay đổi endpoint Cloud Chain bất cứ lúc nào. Mặc định: rpc.localusd.cloud.">
         <div className="flex items-center gap-2 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3">
           <input
             value={rpcDraft}
