@@ -37,8 +37,6 @@ import {
 } from '../lib/notify'
 import { applyTheme } from '../lib/theme'
 import { readLocal, writeLocal, removeLocal, StorageKeys, getOrCreateDeviceId } from '../lib/storage'
-import { downloadBackup, uploadBackup } from '../lib/cloud'
-import { uploadTgBackup, downloadTgBackup } from '../lib/tgCloud'
 import { getTelegramUser, getTelegramUserIdString, telegramReady, isTelegramWebApp, type TelegramUser } from '../lib/telegram'
 import { useRealtimePoll, type SyncResponse } from './useRealtimePoll'
 import { useAutoLock } from './useAutoLock'
@@ -128,8 +126,6 @@ type WalletContextValue = {
   telegramUser: TelegramUser | null
   pinEnabled: boolean
   realtimeConnected: boolean
-  backupAt: number | null
-  backupBusy: boolean
   autoLockSeconds: number | null
   lastPayment: PaymentEvent | null
   airdrop: AirdropState
@@ -157,9 +153,6 @@ type WalletContextValue = {
   lock: () => void
   completeOnboarding: () => void
   extendAutoLock: () => void
-  backupNow: () => Promise<void>
-  restoreFromCloud: (input: string) => Promise<number>
-  restoreFromTelegram: (telegramId: string) => Promise<number>
   pushToast: (toast: Omit<Toast, 'id' | 'createdAt'>) => void
   dismissToast: (id: string) => void
   exportSecrets: (walletId?: string) => string
@@ -208,8 +201,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [history, setHistory] = useState<TxEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
-  const [backupAt, setBackupAt] = useState<number | null>(null)
-  const [backupBusy, setBackupBusy] = useState(false)
   const [lastPayment, setLastPayment] = useState<PaymentEvent | null>(null)
   const [airdrop, setAirdrop] = useState<AirdropState>({
     status: 'idle',
@@ -221,7 +212,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const vaultKeyRef = useRef<Uint8Array | null>(null)
   const seenRef = useRef<Set<string>>(new Set())
   const bootedRef = useRef(false)
-  const backupTimer = useRef<number | undefined>(undefined)
   const lastAirdropStatusRef = useRef<AirdropState['status']>('idle')
 
   const vaultRef = useRef<VaultData | null>(null)
@@ -292,7 +282,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       vaultRef.current = data
       setPrefsState((present) => ({ ...present, ...data.prefs }))
       setSession('unlocked')
-      setBackupAt(data.lastBackupAt)
       seenRef.current = new Set()
       return data
     },
@@ -465,16 +454,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         vaultRef.current = data
         // Register with server for limit enforcement (fire-and-forget).
         void registerWalletWithServer(deviceId, wallet.address)
-        // Auto-backup to Telegram if in Telegram.
-        if (inTelegram && tgId) {
-          void uploadTgBackup(tgId, {
-            wallets: data.wallets,
-            contacts: data.contacts,
-            prefs: data.prefs,
-            txMeta: data.txMeta,
-            samples: data.samples,
-          }).catch(() => undefined)
-        }
         // Stay in 'onboarding' so the secure step is shown.
         return wallet
       }
@@ -551,19 +530,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         body: wallet.address,
       })
 
-      // Auto-backup to Telegram.
-      if (inTelegram && tgId) {
-        const updatedVault = vaultRef.current
-        if (updatedVault) {
-          void uploadTgBackup(tgId, {
-            wallets: updatedVault.wallets,
-            contacts: updatedVault.contacts,
-            prefs: updatedVault.prefs,
-            txMeta: updatedVault.txMeta,
-            samples: updatedVault.samples,
-          }).catch(() => undefined)
-        }
-      }
       return wallet
     },
     [importResultToWallet, pushToast],
@@ -933,164 +899,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     onExtend: () => undefined,
   })
 
-  // --- cloud backup ---------------------------------------------------------
-  const buildBackupPayload = useCallback(() => {
-    const current = vaultRef.current
-    if (!current) return null
-    return {
-      wallets: current.wallets,
-      contacts: current.contacts,
-      settings: { prefs: current.prefs },
-      transactionMeta: current.txMeta,
-      balanceSamples: current.samples,
-    }
-  }, [])
-
-  const backupNow = useCallback(async () => {
-    const current = vaultRef.current
-    if (!current || !current.wallets.length) return
-    const anchor = current.wallets[0]
-    setBackupBusy(true)
-    try {
-      const payload = buildBackupPayload()
-      if (!payload) return
-      const updatedAt = await uploadBackup(anchor.address, Uint8Array.from(anchor.secret), payload)
-      setBackupAt(updatedAt)
-      await persist({ ...current, lastBackupAt: updatedAt, cloudBackup: true })
-      pushToast({ tone: 'success', title: 'Đã sao lưu đám mây', body: `Ví ${anchor.name}` })
-    } catch (error: any) {
-      pushToast({ tone: 'error', title: 'Sao lưu thất bại', body: error?.message })
-    } finally {
-      setBackupBusy(false)
-    }
-  }, [buildBackupPayload, persist, pushToast])
-
-  useEffect(() => {
-    if (session !== 'unlocked' || !vault?.cloudBackup) return
-    window.clearTimeout(backupTimer.current)
-    backupTimer.current = window.setTimeout(() => {
-      void backupNow()
-    }, 4000)
-    return () => window.clearTimeout(backupTimer.current)
-  }, [session, vault?.contacts, vault?.wallets, vault?.txMeta, vault?.prefs, vault?.cloudBackup, backupNow])
-
-  // --- auto-backup to Telegram ID -------------------------------------------
-  useEffect(() => {
-    if (session !== 'unlocked' || !vault?.wallets.length) return
-    const tgId = getTelegramUserIdString()
-    if (!tgId || !isTelegramWebApp()) return
-    const timer = window.setTimeout(() => {
-      void uploadTgBackup(tgId, {
-        wallets: vault.wallets,
-        contacts: vault.contacts,
-        prefs: vault.prefs,
-        txMeta: vault.txMeta,
-        samples: vault.samples,
-      }).catch(() => undefined)
-    }, 5000)
-    return () => window.clearTimeout(timer)
-  }, [session, vault?.wallets, vault?.contacts, vault?.txMeta])
-
-  const restoreFromCloud = useCallback(
-    async (input: string) => {
-      const { keypair } = await importSecret(input)
-      const address = keypair.publicKey.toBase58()
-      const payload = await downloadBackup(address, keypair.secretKey)
-      if (!payload) throw new Error('Không tìm thấy bản sao lưu cho khoá này')
-
-      const vaultKey = newVaultKey()
-      const wallets = (payload.wallets || []) as WalletRecord[]
-      if (!wallets.length) throw new Error('Bản sao lưu không có ví nào')
-      if (wallets.length > MAX_WALLETS) {
-        throw new Error(`Bản sao lưu có ${wallets.length} ví, vượt giới hạn ${MAX_WALLETS} ví`)
-      }
-
-      const data = emptyVault(loadPrefsMirror())
-      data.wallets = wallets
-      data.activeWalletId = wallets[0].id
-      data.contacts = (payload.contacts || []) as Contact[]
-      data.txMeta = (payload.transactionMeta || {}) as VaultData['txMeta']
-      data.samples = (payload.balanceSamples || []) as BalanceSample[]
-      data.cloudBackup = true
-      data.lastBackupAt = payload.savedAt || Date.now()
-
-      const created = await createVaultStore(wallets[0], vaultKey, data)
-      for (const wallet of wallets.slice(1)) {
-        const wrap = await buildKeyWrap(wallet.id, Uint8Array.from(wallet.secret), vaultKey)
-        created.keyWraps[wallet.id] = wrap.envelope
-      }
-      created.index = wallets.map(toIndex)
-      saveStore(created)
-      setStore(created)
-      vaultKeyRef.current = vaultKey
-      setVault(data)
-      vaultRef.current = data
-      // Register all restored wallets with server for limit enforcement.
-      const restoreDeviceId = getOrCreateDeviceId()
-      for (const w of wallets) {
-        void registerWalletWithServer(restoreDeviceId, w.address)
-      }
-      // Stay in 'onboarding' so the secure step is shown.
-      seenRef.current = new Set()
-      pushToast({
-        tone: 'success',
-        title: 'Đã khôi phục từ đám mây',
-        body: `${wallets.length} ví đã được phục hồi`,
-      })
-      return wallets.length
-    },
-    [pushToast],
-  )
-
-  // --- restore from Telegram ID -------------------------------------------
-  const restoreFromTelegram = useCallback(
-    async (telegramId: string): Promise<number> => {
-      const payload = await downloadTgBackup(telegramId)
-      if (!payload) throw new Error('Không tìm thấy bản sao lưu cho Telegram ID này')
-
-      const restoredWallets = (payload.wallets || []) as WalletRecord[]
-      if (!restoredWallets.length) throw new Error('Bản sao lưu không có ví nào')
-      if (restoredWallets.length > MAX_WALLETS) {
-        throw new Error(`Bản sao lưu có ${restoredWallets.length} ví, vượt giới hạn ${MAX_WALLETS} ví`)
-      }
-
-      const vaultKey = newVaultKey()
-      const data = emptyVault(loadPrefsMirror())
-      data.wallets = restoredWallets
-      data.activeWalletId = restoredWallets[0].id
-      data.contacts = (payload.contacts || []) as Contact[]
-      data.txMeta = (payload.txMeta || {}) as VaultData['txMeta']
-      data.samples = (payload.samples || []) as BalanceSample[]
-      data.cloudBackup = true
-      data.lastBackupAt = payload.savedAt || Date.now()
-
-      const created = await createVaultStore(restoredWallets[0], vaultKey, data)
-      for (const wallet of restoredWallets.slice(1)) {
-        const wrap = await buildKeyWrap(wallet.id, Uint8Array.from(wallet.secret), vaultKey)
-        created.keyWraps[wallet.id] = wrap.envelope
-      }
-      created.index = restoredWallets.map(toIndex)
-      saveStore(created)
-      setStore(created)
-      vaultKeyRef.current = vaultKey
-      setVault(data)
-      vaultRef.current = data
-
-      const restoreDeviceId = getOrCreateDeviceId()
-      for (const w of restoredWallets) {
-        void registerWalletWithServer(restoreDeviceId, w.address)
-      }
-      seenRef.current = new Set()
-      pushToast({
-        tone: 'success',
-        title: 'Đã khôi phục ví từ Telegram',
-        body: `${restoredWallets.length} ví đã được phục hồi`,
-      })
-      return restoredWallets.length
-    },
-    [pushToast],
-  )
-
   // --- pin setup --------------------------------------------------
   const setPin = useCallback(
     async (pin: string) => {
@@ -1247,8 +1055,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     telegramUser,
     pinEnabled,
     realtimeConnected,
-    backupAt,
-    backupBusy,
     autoLockSeconds: secondsLeft,
     lastPayment,
     airdrop,
@@ -1270,9 +1076,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     lock,
     completeOnboarding,
     extendAutoLock: extend,
-    backupNow,
-    restoreFromCloud,
-    restoreFromTelegram,
     pushToast,
     dismissToast,
     exportSecrets,

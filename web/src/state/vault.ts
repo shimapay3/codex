@@ -58,8 +58,6 @@ export type VaultData = {
   txMeta: TxMeta
   samples: BalanceSample[]
   prefs: Prefs
-  cloudBackup: boolean
-  lastBackupAt: number | null
 }
 
 export type WalletIndexEntry = {
@@ -98,8 +96,6 @@ export function emptyVault(prefs: Prefs): VaultData {
     txMeta: {},
     samples: [],
     prefs,
-    cloudBackup: true,
-    lastBackupAt: null,
   }
 }
 

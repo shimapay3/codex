@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   BellRing,
   Check,
-  CloudUpload,
   Copy,
   Download,
   Gauge,
@@ -97,10 +96,6 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
     setPin,
     clearPin,
     lock,
-    backupAt,
-    backupBusy,
-    backupNow,
-    restoreFromCloud,
     wallets,
     activeWallet,
     exportSecrets,
@@ -118,7 +113,6 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
   const [endpointDraft, setEndpointDraft] = useState(prefs.priceEndpoint)
   const [testing, setTesting] = useState(false)
   const [pinDraft, setPinDraft] = useState('')
-  const [restoreDraft, setRestoreDraft] = useState('')
   const [revealed, setRevealed] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
 
@@ -353,56 +347,6 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
         >
           <Volume2 size={15} /> Nghe thử chuông nhận tiền
         </button>
-      </Section>
-
-      <Section
-        icon={<CloudUpload size={15} />}
-        title="Sao lưu đám mây cá nhân"
-        hint="Két được mã hoá bằng chính khoá bí mật của ví neo trước khi tải lên — máy chủ chỉ giữ ciphertext."
-      >
-        <Row label="Tự động sao lưu">
-          <Toggle value={!!wallets.length} onChange={() => undefined} />
-        </Row>
-        <div className="rounded-2xl bg-[color:var(--surface)] px-3.5 py-3 text-[11.5px]">
-          {backupAt
-            ? `Bản sao lưu gần nhất: ${new Date(backupAt).toLocaleString('vi-VN')}`
-            : 'Chưa có bản sao lưu nào'}
-        </div>
-        <button
-          type="button"
-          disabled={backupBusy}
-          onClick={backupNow}
-          className="w-full rounded-2xl accent-gradient py-3 text-[13px] font-semibold text-white shadow-glow disabled:opacity-60"
-        >
-          {backupBusy ? 'Đang sao lưu…' : 'Sao lưu ngay'}
-        </button>
-        <div className="space-y-2 rounded-2xl border border-[color:var(--border)] p-3">
-          <p className="text-[11.5px] font-semibold">Khôi phục từ đám mây</p>
-          <textarea
-            value={restoreDraft}
-            onChange={(event) => setRestoreDraft(event.target.value)}
-            rows={3}
-            spellCheck={false}
-            placeholder="Nhập khoá bí mật của ví đã sao lưu"
-            className="w-full resize-none rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2.5 font-mono text-[11.5px] outline-none focus:border-[color:var(--accent)]"
-          />
-          <button
-            type="button"
-            disabled={!restoreDraft.trim()}
-            onClick={async () => {
-              try {
-                const count = await restoreFromCloud(restoreDraft)
-                setRestoreDraft('')
-                toast({ tone: 'success', title: `Đã khôi phục ${count} ví` })
-              } catch (error: any) {
-                toast({ tone: 'error', title: 'Khôi phục thất bại', body: error?.message })
-              }
-            }}
-            className="w-full rounded-2xl border border-[color:var(--border)] py-3 text-[12.5px] font-semibold disabled:opacity-45"
-          >
-            Khôi phục
-          </button>
-        </div>
       </Section>
 
       <Section

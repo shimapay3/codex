@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   ArrowRight,
-  CloudDownload,
+  Download,
   KeyRound,
   Loader2,
   ShieldCheck,
@@ -21,12 +21,13 @@ import {
   getTelegramPhotoUrl,
   TELEGRAM_LOGO,
 } from '../lib/telegram'
-import { copyToClipboard } from '../lib/format'
+import { copyToClipboard, downloadTextFile } from '../lib/format'
+import { shortAddress } from '../lib/crypto'
 
 type Step = 'welcome' | 'method' | 'import' | 'restore' | 'secure'
 
 export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
-  const { createWallet, restoreFromCloud, restoreFromTelegram, setPin, wallets, pushToast, completeOnboarding, telegramUser } =
+  const { createWallet, setPin, wallets, pushToast, completeOnboarding, telegramUser, exportSecrets } =
     useWallet()
   const [step, setStep] = useState<Step>('welcome')
   const [secret, setSecret] = useState('')
@@ -201,37 +202,6 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
               </span>
             </button>
 
-            {/* Restore by Telegram ID — only in Telegram */}
-            {inTelegram && (
-              <button
-                type="button"
-                disabled={busy || !tgId}
-                onClick={() =>
-                  run(async () => {
-                    if (!tgId) return
-                    const count = await restoreFromTelegram(tgId)
-                    if (count > 0) {
-                      pushToast({ tone: 'success', title: `Đã khôi phục ${count} ví` })
-                      setStep('secure')
-                    } else {
-                      setError('Không tìm thấy bản sao lưu cho Telegram ID này')
-                    }
-                  })
-                }
-                className="flex w-full items-center gap-3 rounded-2xl border border-[color:var(--border)] px-4 py-4 text-left disabled:opacity-50"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--surface-strong)]">
-                  {busy ? <Loader2 size={18} className="animate-spin" /> : <CloudDownload size={19} />}
-                </span>
-                <span>
-                  <span className="block text-[14px] font-semibold">Khôi phục ví bằng Telegram</span>
-                  <span className="block text-[11px] text-[color:var(--muted)]">
-                    Tự động phục hồi tất cả ví từ ID Telegram
-                  </span>
-                </span>
-              </button>
-            )}
-
             {error && (
               <p className="rounded-2xl border border-[#ff6b81]/40 bg-[#ff6b81]/10 px-3.5 py-3 text-[12px] text-[#ff8fa1]">
                 {error}
@@ -244,11 +214,11 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
           </div>
         )}
 
-        {(step === 'import' || step === 'restore') && (
+        {step === 'import' && (
           <div className="space-y-3">
             <div className="rounded-[26px] glass p-5">
               <p className="mb-2 text-[13px] font-semibold">
-                {step === 'import' ? 'Nhập khoá bí mật' : 'Khôi phục ví từ sao lưu đám mây'}
+                Nhập khoá bí mật
               </p>
               <textarea
                 value={secret}
@@ -259,9 +229,7 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
                 className="w-full resize-none rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 font-mono text-[12.5px] outline-none focus:border-[color:var(--accent)]"
               />
               <p className="mt-2 text-[11px] leading-relaxed text-[color:var(--muted)]">
-                {step === 'import'
-                  ? 'Hỗ trợ mảng JSON nhị phân (secretKey), base58, private key hex, cụm 12/24 từ BIP39 và passphrase tự do.'
-                  : 'Bản sao lưu được mã hoá bằng chính khoá bí mật của bạn — máy chủ không đọc được nội dung.'}
+                Hỗ trợ mảng JSON nhị phân (secretKey), base58, private key hex, cụm 12/24 từ BIP39 và passphrase tự do.
               </p>
             </div>
 
@@ -284,25 +252,21 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
                 disabled={busy || !secret.trim()}
                 onClick={() =>
                   run(async () => {
-                    if (step === 'import') {
-                      await createWallet(secret, 'Ví của tôi')
-                      // Check SOL balance after import — warn if insufficient
-                      try {
-                        const sol = await getSolBalance(DEFAULT_RPC_URL, (await import('../lib/crypto')).importSecret(secret).then(r => r.keypair.publicKey.toBase58()).catch(() => ''))
-                        if (sol < 0.05) {
-                          setSolWarning(`Ví chỉ có ${sol.toFixed(6)} SOL — không đủ phí gas. Mở trong Telegram để nhận airdrop SOL.`)
-                        }
-                      } catch { /* ignore balance check failure */ }
-                    } else {
-                      await restoreFromCloud(secret)
-                    }
+                    await createWallet(secret, 'Ví của tôi')
+                    // Check SOL balance after import — warn if insufficient
+                    try {
+                      const sol = await getSolBalance(DEFAULT_RPC_URL, (await import('../lib/crypto')).importSecret(secret).then(r => r.keypair.publicKey.toBase58()).catch(() => ''))
+                      if (sol < 0.05) {
+                        setSolWarning(`Ví chỉ có ${sol.toFixed(6)} SOL — không đủ phí gas. Mở trong Telegram để nhận airdrop SOL.`)
+                      }
+                    } catch { /* ignore balance check failure */ }
                     setStep('secure')
                   })
                 }
                 className="flex items-center justify-center gap-2 rounded-2xl accent-gradient py-3.5 text-[13px] font-semibold text-white disabled:opacity-50"
               >
                 {busy && <Loader2 size={15} className="animate-spin" />}
-                {step === 'import' ? 'Nhập ví' : 'Khôi phục'}
+                Nhập ví
               </button>
             </div>
 
@@ -357,6 +321,29 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
                 Lưu PIN & vào ví
               </button>
             </div>
+
+            {/* Download imported key file */}
+            {wallets.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    const wallet = wallets[wallets.length - 1]
+                    const data = exportSecrets(wallet.id)
+                    downloadTextFile(
+                      `cloudpay-${shortAddress(wallet.address, 4)}.json`,
+                      data,
+                    )
+                    pushToast({ tone: 'info', title: 'Đã tải khoá bí mật' })
+                  } catch (error: any) {
+                    pushToast({ tone: 'error', title: 'Không tải được', body: error?.message })
+                  }
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] py-3.5 text-[13px] font-semibold"
+              >
+                <Download size={15} /> Tải file khoá bí mật
+              </button>
+            )}
 
             {error && (
               <p className="rounded-2xl border border-[#ff6b81]/40 bg-[#ff6b81]/10 px-3.5 py-3 text-[12px] text-[#ff8fa1]">
