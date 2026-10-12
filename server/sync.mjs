@@ -1,18 +1,99 @@
 import { rpcMethod, sanitizeRpcUrl, DEFAULT_RPC } from './rpc.mjs'
+import { getState } from './store.mjs'
 
 /**
- * Unified realtime endpoint.
+ * Unified sync endpoint — the single realtime API the client polls every 5 s.
  *
- * Merges balance, history, and airdrop status into a single server-side
- * poll so the client makes one request every 5 s instead of multiple
- * parallel calls + a WebSocket.
+ * Merges into one response:
+ *   • USDC balance (via RPC)
+ *   • SOL balance   (via RPC)
+ *   • Recent USDC transactions (via RPC)
+ *   • Airdrop status (server-side state)
+ *   • Price info     (fixed or cached from endpoint)
+ *
+ * Replaces the old /api/realtime + separate airdrop-status + price polls.
  */
 
 const USDC_MINT = 'USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2'
 const TOKEN_2022 = 'TokenzQdBNbLqP5VEhPkASv1L5Xuo6YHuHD4qLm9Q'
 
+const FIXED_USD = 1
+const FIXED_VND = 30000
+const PRICE_ENDPOINT = (process.env.PRICE_ENDPOINT || '').trim()
+const PRICE_CACHE_MS = 60000
+
+const priceCache = new Map()
+
 function lamportsToSol(lamports) {
   return (typeof lamports === 'number' ? lamports : 0) / 1_000_000_000
+}
+
+function coerceNumber(value) {
+  const n = typeof value === 'string' ? Number.parseFloat(value) : value
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : null
+}
+
+function pickPrice(payload) {
+  if (!payload || typeof payload !== 'object') return null
+  const usd =
+    coerceNumber(payload.usd) ??
+    coerceNumber(payload.USD) ??
+    coerceNumber(payload.usdPrice) ??
+    coerceNumber(payload.price) ??
+    coerceNumber(payload?.data?.usd) ??
+    coerceNumber(payload?.data?.price) ??
+    coerceNumber(payload?.['usd-coin']?.usd) ??
+    null
+  const vnd =
+    coerceNumber(payload.vnd) ??
+    coerceNumber(payload.VND) ??
+    coerceNumber(payload.vndPrice) ??
+    coerceNumber(payload?.data?.vnd) ??
+    coerceNumber(payload?.['usd-coin']?.vnd) ??
+    null
+  if (!usd && !vnd) return null
+  return { usd: usd ?? FIXED_USD, vnd: vnd ?? (usd ? Math.round(usd * FIXED_VND) : FIXED_VND) }
+}
+
+async function getPrice(endpoint) {
+  const url = (typeof endpoint === 'string' ? endpoint.trim() : '') || PRICE_ENDPOINT
+  if (!url) {
+    return { usd: FIXED_USD, vnd: FIXED_VND, source: 'fixed' }
+  }
+  const cached = priceCache.get(url)
+  if (cached && Date.now() - cached.at < PRICE_CACHE_MS) {
+    return cached.value
+  }
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 5000)
+    const upstream = await fetch(url, {
+      headers: { accept: 'application/json' },
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    const payload = await upstream.json()
+    const price = pickPrice(payload)
+    if (!price) throw new Error('Không đọc được giá')
+    const result = { ...price, source: 'endpoint' }
+    priceCache.set(url, { value: result, at: Date.now() })
+    return result
+  } catch {
+    return { usd: FIXED_USD, vnd: FIXED_VND, source: 'fixed', fallback: true }
+  }
+}
+
+function getAirdropStatus(address) {
+  const state = getState()
+  const record = state.airdrops?.records?.[address]
+  if (!record) return { status: 'none', address, signature: null, confirmedAt: null, error: null }
+  return {
+    status: record.status,
+    address,
+    signature: record.signature || null,
+    confirmedAt: record.confirmedAt || null,
+    error: record.error || null,
+  }
 }
 
 async function fetchUsdcBalance(rpcUrl, owner) {
@@ -95,7 +176,6 @@ async function fetchRecentTxs(rpcUrl, owner, limit = 15) {
           const delta = sum(mine(tx?.meta?.postTokenBalances)) - sum(mine(tx?.meta?.preTokenBalances))
           const others = (tx?.meta?.postTokenBalances || []).filter((b) => b.mint === USDC_MINT && b.owner && b.owner !== owner)
 
-          // Extract memo
           let memo = ''
           for (const list of [tx?.transaction?.message?.instructions || [], ...(tx?.meta?.innerInstructions || []).map((i) => i?.instructions || [])]) {
             for (const ix of list) {
@@ -132,8 +212,8 @@ async function fetchRecentTxs(rpcUrl, owner, limit = 15) {
   }
 }
 
-export async function handleRealtime(req, res) {
-  const { address, rpcUrl: rawRpc, lastSignature } = req.body || {}
+export async function handleSync(req, res) {
+  const { address, rpcUrl: rawRpc, lastSignature, priceEndpoint } = req.body || {}
   if (!address || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
     res.status(400).json({ error: 'Địa chỉ không hợp lệ' })
     return
@@ -141,13 +221,15 @@ export async function handleRealtime(req, res) {
   const rpcUrl = sanitizeRpcUrl(rawRpc) || DEFAULT_RPC
 
   try {
-    const [usdc, sol, transactions] = await Promise.all([
+    const [usdc, sol, transactions, price] = await Promise.all([
       fetchUsdcBalance(rpcUrl, address),
       fetchSolBalance(rpcUrl, address),
       fetchRecentTxs(rpcUrl, address, 15),
+      getPrice(priceEndpoint),
     ])
 
-    // Check for new transactions since lastSignature
+    const airdrop = getAirdropStatus(address)
+
     let newCount = 0
     if (lastSignature && transactions.length) {
       const idx = transactions.findIndex((t) => t.signature === lastSignature)
@@ -163,9 +245,11 @@ export async function handleRealtime(req, res) {
       decimals: usdc.decimals,
       transactions,
       newCount,
+      airdrop,
+      price,
       at: Date.now(),
     })
   } catch (err) {
-    res.status(500).json({ error: 'Realtime fetch failed', detail: err?.message })
+    res.status(500).json({ error: 'Sync failed', detail: err?.message })
   }
 }

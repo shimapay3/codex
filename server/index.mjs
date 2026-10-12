@@ -1,10 +1,8 @@
 import http from 'node:http'
 import express from 'express'
 import { DEFAULT_RPC, handleRpcProxy } from './rpc.mjs'
-import { startWatcher } from './watcher.mjs'
 import { startAirdropCron, handleAirdropRequest, handleAirdropStatus, handleAirdropInfo, handleAirdropEligibility } from './airdrop.mjs'
-import { handleRealtime } from './realtime.mjs'
-import { handlePinReset } from './pinReset.mjs'
+import { handleSync } from './sync.mjs'
 import { getState, load, save } from './store.mjs'
 
 const PORT = Number(process.env.PORT || 8000)
@@ -40,15 +38,10 @@ app.get('/api/airdrop/eligibility/:telegramId', handleAirdropEligibility)
 app.get('/api/airdrop/status/:address', handleAirdropStatus)
 app.get('/api/airdrop/info', handleAirdropInfo)
 
-// --- Unified realtime endpoint -------------------------------------------
-// One POST returns USDC balance, SOL balance, and recent transactions.
-// The client polls this every 5 s instead of multiple separate calls.
-app.post('/api/realtime', handleRealtime)
-
-// --- Admin: PIN reset for Telegram users -----------------------------------
-// Decrypts the Telegram backup server-side and returns a complete localStorage
-// payload (vault store + PIN wrap) that the client can import to reset a PIN.
-app.post('/api/admin/reset-pin/:telegramId', handlePinReset)
+// --- Unified sync endpoint -------------------------------------------------
+// One POST returns USDC balance, SOL balance, recent transactions, airdrop
+// status, and price — the single realtime API the client polls every 5 s.
+app.post('/api/sync', handleSync)
 
 // --- Wallet creation limit (max 5 per device) -------------------------------
 // Each device is identified by a client-generated ID stored in localStorage.
@@ -315,7 +308,6 @@ app.delete('/api/tg-backup/:telegramId', (req, res) => {
 load()
 
 const server = http.createServer(app)
-startWatcher(server)
 startAirdropCron()
 
 server.listen(PORT, '0.0.0.0', () => {

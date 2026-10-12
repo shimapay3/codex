@@ -13,10 +13,7 @@ import {
   DEFAULT_RPC_URL,
   PriceInfo,
   TxEntry,
-  AirdropInfo,
-  fetchPrice,
   fetchTokenHistory,
-  fetchTransactionSummary,
   getSolBalance,
   getUsdcBalance,
   requestAirdrop,
@@ -43,7 +40,7 @@ import { readLocal, writeLocal, removeLocal, StorageKeys, getOrCreateDeviceId } 
 import { downloadBackup, uploadBackup } from '../lib/cloud'
 import { uploadTgBackup, downloadTgBackup } from '../lib/tgCloud'
 import { getTelegramUser, getTelegramUserIdString, telegramReady, isTelegramWebApp, type TelegramUser } from '../lib/telegram'
-import { useRealtimePoll } from './useRealtimePoll'
+import { useRealtimePoll, type SyncResponse } from './useRealtimePoll'
 import { useAutoLock } from './useAutoLock'
 import {
   BalanceSample,
@@ -86,6 +83,14 @@ export const DEFAULT_PREFS: Prefs = {
 }
 
 export type Session = 'booting' | 'onboarding' | 'locked' | 'unlocked'
+
+export type PaymentEvent = {
+  address: string
+  signature: string
+  slot: number
+  blockTime: number | null
+  memo: string | null
+}
 
 export type Toast = {
   id: string
@@ -144,6 +149,7 @@ type WalletContextValue = {
     category?: string
     wish?: string
   }) => Promise<string>
+  sendSol: (params: { to: string; amount: number; memo?: string }) => Promise<string>
   unlockWithPin: (pin: string) => Promise<void>
   unlockWithSecret: (input: string) => Promise<void>
   setPin: (pin: string) => Promise<void>
@@ -760,73 +766,17 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     await Promise.all([refreshBalance(), refreshHistory({ silent: true })])
   }, [refreshBalance, refreshHistory])
 
-  // --- SOL airdrop status check --------------------------------------------
-  const checkAirdrop = useCallback(
-    async (address: string) => {
-      try {
-        const info = await fetchAirdropStatus(address)
-        const status = (info.status === 'none' ? 'idle' : info.status) as AirdropState['status']
-        lastAirdropStatusRef.current = status
-        setAirdrop({
-          status,
-          payserver: info.payserver || null,
-          signature: info.signature,
-          error: info.error,
-        })
-      } catch {
-        lastAirdropStatusRef.current = 'idle'
-        setAirdrop({ status: 'idle', payserver: null, signature: null, error: null })
-      }
-    },
-    [],
-  )
-
-  // Poll airdrop status while pending or sending.
-  useEffect(() => {
-    if (airdrop.status !== 'pending' && airdrop.status !== 'sending') return
-    const wallet =
-      vaultRef.current?.wallets.find((w) => w.id === vaultRef.current?.activeWalletId) ||
-      vaultRef.current?.wallets[0]
-    if (!wallet) return
-    const timer = window.setInterval(async () => {
-      const info = await fetchAirdropStatus(wallet.address)
-      const status = (info.status === 'none' ? 'idle' : info.status) as AirdropState['status']
-      if (status === lastAirdropStatusRef.current) return
-      lastAirdropStatusRef.current = status
-      setAirdrop({
-        status,
-        payserver: info.payserver || null,
-        signature: info.signature,
-        error: info.error,
-      })
-      if (status === 'confirmed') {
-        if (prefs.sound) ringIncoming()
-        vibrate([90, 60, 90])
-        if (prefs.notifications) showSystemNotification('Đã nhận SOL', 'Payserver đã chuyển SOL phí gas')
-        pushToast({ tone: 'success', title: 'Đã nhận SOL', body: 'Ví đã được nạp phí gas' })
-        void refresh()
-      } else if (status === 'error') {
-        pushToast({ tone: 'error', title: 'Airdrop thất bại', body: info.error || 'Không nhận được SOL' })
-      }
-    }, 5000)
-    return () => window.clearInterval(timer)
-  }, [airdrop.status, prefs.notifications, prefs.sound, pushToast, refresh])
-
-  // Check airdrop when session unlocks or active wallet changes.
-  useEffect(() => {
-    if (session !== 'unlocked') return
-    const wallet = activeWallet
-    if (!wallet) return
-    void checkAirdrop(wallet.address)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, activeWallet?.id, prefs.rpcUrl])
+  // --- SOL airdrop status (handled by /api/sync poll) -----------------------
+  // Airdrop status is included in the /api/sync response, so no separate
+  // polling effect is needed. The sync callback updates the airdrop state
+  // and shows toasts when the status changes.
 
   // --- realtime (unified 5s poll) ------------------------------------------
   const activeAddress = activeWallet?.address ?? null
   const rpcUrl = prefs.rpcUrl || DEFAULT_RPC_URL
 
   const handleRealtimePoll = useCallback(
-    (data: { usdcBalance: number; solBalance: number; decimals: number; transactions: TxEntry[]; newCount: number }) => {
+    (data: SyncResponse) => {
       // Update balances
       setBalance({
         usdc: data.usdcBalance,
@@ -834,6 +784,34 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         decimals: data.decimals || USDC_DECIMALS_FALLBACK,
         loading: false,
       })
+
+      // Update price
+      if (data.price) {
+        setPrice(data.price)
+      }
+
+      // Update airdrop status from sync
+      if (data.airdrop) {
+        const newStatus = (data.airdrop.status === 'none' ? 'idle' : data.airdrop.status) as AirdropState['status']
+        const prevStatus = lastAirdropStatusRef.current
+        if (newStatus !== prevStatus) {
+          lastAirdropStatusRef.current = newStatus
+          setAirdrop({
+            status: newStatus,
+            payserver: null,
+            signature: data.airdrop.signature,
+            error: data.airdrop.error,
+          })
+          if (newStatus === 'confirmed' && prevStatus !== 'idle') {
+            if (prefs.sound) ringIncoming()
+            vibrate([90, 60, 90])
+            if (prefs.notifications) showSystemNotification('Đã nhận SOL', 'Payserver đã chuyển SOL phí gas')
+            pushToast({ tone: 'success', title: 'Đã nhận SOL', body: 'Ví đã được nạp phí gas' })
+          } else if (newStatus === 'error' && prevStatus !== 'idle') {
+            pushToast({ tone: 'error', title: 'Airdrop thất bại', body: data.airdrop.error || 'Không nhận được SOL' })
+          }
+        }
+      }
 
       // Update history
       if (data.transactions.length) {
@@ -869,12 +847,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [announcePayment, activeWallet?.address],
+    [announcePayment, activeWallet?.address, prefs.notifications, prefs.sound, pushToast],
   )
 
   useRealtimePoll({
     rpcUrl,
     address: activeAddress,
+    priceEndpoint: prefs.priceEndpoint,
     enabled: session === 'unlocked' && !!activeAddress,
     onResult: handleRealtimePoll,
   })
@@ -927,13 +906,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, activeWallet?.id, rpcUrl])
 
-  useEffect(() => {
-    if (session !== 'unlocked') return
-    const load = () => void fetchPrice(prefs.priceEndpoint).then(setPrice)
-    load()
-    const timer = window.setInterval(load, 60000)
-    return () => window.clearInterval(timer)
-  }, [session, prefs.priceEndpoint])
+  // --- price (handled by /api/sync poll) ------------------------------------
+  // Price is included in the /api/sync response, so no separate polling
+  // effect is needed. The sync callback updates the price state.
 
   // --- auto lock ------------------------------------------------------------
   const lock = useCallback(() => {
@@ -1193,6 +1168,47 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     [balance.decimals, persist, prefs.notifications, prefs.sound, pushToast, refresh],
   )
 
+  // --- send SOL -------------------------------------------------------------
+  const sendSol = useCallback(
+    async (params: { to: string; amount: number; memo?: string }) => {
+      const current = vaultRef.current
+      const wallet = current?.wallets.find((w) => w.id === current.activeWalletId) || current?.wallets[0]
+      if (!current || !wallet) throw new Error('Chưa chọn ví')
+
+      const rpcUrlNow = current.prefs.rpcUrl || DEFAULT_RPC_URL
+      const keypair = Keypair.fromSecretKey(Uint8Array.from(wallet.secret))
+
+      try {
+        const signature = await transferSol(rpcUrlNow, keypair, params.to.trim(), params.amount, params.memo)
+
+        if (prefs.sound) ringSuccess()
+        vibrate([60, 40, 120])
+        if (prefs.notifications) {
+          showSystemNotification(
+            'Chuyển SOL thành công',
+            `${params.amount} SOL · ${params.memo || 'không ghi chú'}`,
+            signature,
+          )
+        }
+        pushToast({
+          tone: 'success',
+          title: 'Chuyển SOL thành công',
+          body: `${params.amount} SOL đã gửi`,
+          signature,
+        })
+        void refresh()
+        return signature
+      } catch (error: any) {
+        if (prefs.sound) ringError()
+        vibrate(220)
+        const message = error?.message || 'Giao dịch thất bại'
+        pushToast({ tone: 'error', title: 'Chuyển SOL thất bại', body: message })
+        throw new Error(message)
+      }
+    },
+    [prefs.notifications, prefs.sound, pushToast, refresh],
+  )
+
   const exportSecrets = useCallback(
     (walletId?: string) => {
       const current = vaultRef.current
@@ -1246,6 +1262,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     saveContacts,
     saveTxMeta,
     send,
+    sendSol,
     unlockWithPin,
     unlockWithSecret,
     setPin,

@@ -624,6 +624,7 @@ export async function transferSol(
   from: Keypair,
   toAddress: string,
   solAmount: number,
+  memo?: string,
 ): Promise<string> {
   const lamports = Math.floor(solAmount * 1_000_000_000)
   if (lamports <= 0) throw new Error('Số lượng SOL không hợp lệ')
@@ -636,6 +637,17 @@ export async function transferSol(
     recentBlockhash: blockhash.value.blockhash,
   })
   tx.add(SystemProgram.transfer({ fromPubkey: from.publicKey, toPubkey: recipient, lamports }))
+
+  if (memo?.trim()) {
+    tx.add(
+      new TransactionInstruction({
+        keys: [],
+        programId: MEMO_PROGRAM_ID,
+        data: Buffer.from(memo.trim().slice(0, 500), 'utf8'),
+      }),
+    )
+  }
+
   tx.sign(from)
 
   const signature = await rpcFetch<string>(rpcUrl, 'sendTransaction', [

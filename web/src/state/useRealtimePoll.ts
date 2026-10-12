@@ -1,29 +1,38 @@
-import { useCallback, useEffect, useRef } from 'react'
-import { rpcFetch, TxEntry, USDC_DECIMALS_FALLBACK } from '../lib/solana'
+import { useEffect, useRef } from 'react'
+import { TxEntry, PriceInfo, AirdropInfo } from '../lib/solana'
 
-type RealtimeResponse = {
+export type SyncResponse = {
   address: string
   usdcBalance: number
   solBalance: number
   decimals: number
   transactions: TxEntry[]
   newCount: number
+  airdrop: {
+    status: AirdropInfo['status']
+    address: string
+    signature: string | null
+    confirmedAt: number | null
+    error: string | null
+  }
+  price: PriceInfo
   at: number
 }
 
 type Options = {
   rpcUrl: string
   address: string | null
+  priceEndpoint?: string
   enabled: boolean
-  onResult: (data: RealtimeResponse) => void
+  onResult: (data: SyncResponse) => void
 }
 
 /**
- * Unified realtime polling — hits the server's /api/realtime endpoint every
- * 5 seconds. The server merges balance + history into one response so the
- * client makes a single request instead of multiple parallel calls.
+ * Unified sync polling — hits the server's /api/sync endpoint every 5 seconds.
+ * The server merges balance + history + airdrop status + price into one
+ * response so the client makes a single request instead of multiple polls.
  */
-export function useRealtimePoll({ rpcUrl, address, enabled, onResult }: Options) {
+export function useRealtimePoll({ rpcUrl, address, priceEndpoint, enabled, onResult }: Options) {
   const handler = useRef(onResult)
   handler.current = onResult
 
@@ -36,13 +45,13 @@ export function useRealtimePoll({ rpcUrl, address, enabled, onResult }: Options)
     const poll = async () => {
       if (cancelled) return
       try {
-        const res = await fetch('/api/realtime', {
+        const res = await fetch('/api/sync', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ address, rpcUrl }),
+          body: JSON.stringify({ address, rpcUrl, priceEndpoint }),
         })
         if (cancelled || !res.ok) return
-        const data: RealtimeResponse = await res.json()
+        const data: SyncResponse = await res.json()
         handler.current(data)
       } catch {
         /* network hiccup — next tick retries */
@@ -56,5 +65,5 @@ export function useRealtimePoll({ rpcUrl, address, enabled, onResult }: Options)
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [enabled, address, rpcUrl])
+  }, [enabled, address, rpcUrl, priceEndpoint])
 }
