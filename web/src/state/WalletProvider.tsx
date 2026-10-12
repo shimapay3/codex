@@ -19,8 +19,10 @@ import {
   fetchTransactionSummary,
   getSolBalance,
   getUsdcBalance,
-  initAirdrop,
+  requestAirdrop,
+  checkAirdropEligibility,
   fetchAirdropStatus,
+  transferSol,
   sendUsdc,
   USDC_DECIMALS_FALLBACK,
   MAX_WALLETS,
@@ -39,7 +41,8 @@ import {
 import { applyTheme } from '../lib/theme'
 import { readLocal, writeLocal, removeLocal, StorageKeys, getOrCreateDeviceId } from '../lib/storage'
 import { downloadBackup, uploadBackup } from '../lib/cloud'
-import { getTelegramUser, telegramReady, type TelegramUser } from '../lib/telegram'
+import { uploadTgBackup, downloadTgBackup } from '../lib/tgCloud'
+import { getTelegramUser, getTelegramUserIdString, telegramReady, isTelegramWebApp, type TelegramUser } from '../lib/telegram'
 import { useRealtimePoll } from './useRealtimePoll'
 import { useAutoLock } from './useAutoLock'
 import {
@@ -150,6 +153,7 @@ type WalletContextValue = {
   extendAutoLock: () => void
   backupNow: () => Promise<void>
   restoreFromCloud: (input: string) => Promise<number>
+  restoreFromTelegram: (telegramId: string) => Promise<number>
   pushToast: (toast: Omit<Toast, 'id' | 'createdAt'>) => void
   dismissToast: (id: string) => void
   exportSecrets: (walletId?: string) => string
@@ -167,6 +171,18 @@ function loadPrefsMirror(): Prefs {
   const prefs = { ...DEFAULT_PREFS, ...readLocal<Partial<Prefs>>(StorageKeys.prefs, {}) }
   if (prefs.rpcUrl === 'https://rpc.dolaxanh.com') prefs.rpcUrl = DEFAULT_RPC_URL
   return prefs
+}
+
+/** Poll airdrop status until confirmed or error (max 90s). */
+async function waitForAirdrop(address: string, timeoutMs = 90000): Promise<boolean> {
+  const started = Date.now()
+  while (Date.now() - started < timeoutMs) {
+    const info = await fetchAirdropStatus(address)
+    if (info.status === 'confirmed') return true
+    if (info.status === 'error') throw new Error(info.error || 'Airdrop thất bại')
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+  }
+  throw new Error('Airdrop quá hạn — vui lòng thử lại')
 }
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
@@ -381,6 +397,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     async (input?: string, name?: string): Promise<WalletRecord> => {
       const currentVault = vaultRef.current
       const currentKey = vaultKeyRef.current
+      const inTelegram = isTelegramWebApp()
+      const tgId = getTelegramUserIdString()
 
       // First wallet of a brand new install: bootstrap the encrypted vault.
       if (!currentVault || !currentKey) {
@@ -399,6 +417,28 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
               kind: 'generated' as ImportResult['kind'],
               canonicalSecret: Array.from(generated.secretKey),
             }
+
+        // Telegram: request 10 SOL airdrop before creating the wallet.
+        // Airdrop must succeed before the wallet is created.
+        if (inTelegram && tgId && !input?.trim()) {
+          const eligibility = await checkAirdropEligibility(tgId)
+          if (!eligibility.canReceive) {
+            throw new Error(
+              `Đã đạt giới hạn airdrop ${eligibility.limit} SOL trong ${eligibility.windowDays} ngày. ` +
+              `Đã nhận ${eligibility.received} SOL, còn ${eligibility.remaining} SOL.`,
+            )
+          }
+          const airdropRes = await requestAirdrop(result.keypair.publicKey.toBase58(), tgId)
+          if (airdropRes.status === 'error') {
+            throw new Error(airdropRes.error || 'Airdrop thất bại — không thể tạo ví')
+          }
+          if (airdropRes.status === 'pending' || airdropRes.status === 'sending') {
+            pushToast({ tone: 'info', title: 'Đang chờ airdrop 10 SOL…', body: 'Vui lòng đợi giao dịch xác nhận' })
+            await waitForAirdrop(result.keypair.publicKey.toBase58())
+            pushToast({ tone: 'success', title: 'Đã nhận 10 SOL', body: 'Airdrop thành công — ví đã có phí gas' })
+          }
+        }
+
         const vaultKey = newVaultKey()
         const wallet: WalletRecord = {
           id: `w-${Date.now()}`,
@@ -419,6 +459,16 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         vaultRef.current = data
         // Register with server for limit enforcement (fire-and-forget).
         void registerWalletWithServer(deviceId, wallet.address)
+        // Auto-backup to Telegram if in Telegram.
+        if (inTelegram && tgId) {
+          void uploadTgBackup(tgId, {
+            wallets: data.wallets,
+            contacts: data.contacts,
+            prefs: data.prefs,
+            txMeta: data.txMeta,
+            samples: data.samples,
+          }).catch(() => undefined)
+        }
         // Stay in 'onboarding' so the secure step is shown.
         return wallet
       }
@@ -435,12 +485,79 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // Telegram: transfer SOL from existing wallet to new wallet before creating.
+      // Transfer 10 SOL / total wallets (including the new one).
+      if (inTelegram && tgId && !input?.trim() && currentVault.wallets.length > 0) {
+        const totalAfter = currentVault.wallets.length + 1
+        const transferAmount = 10 / totalAfter
+        const rpcUrlNow = currentVault.prefs.rpcUrl || DEFAULT_RPC_URL
+
+        // Find the wallet with the most SOL.
+        const solBalances = await Promise.all(
+          currentVault.wallets.map(async (w) => ({
+            wallet: w,
+            sol: await getSolBalance(rpcUrlNow, w.address),
+          })),
+        )
+        const richest = solBalances.sort((a, b) => b.sol - a.sol)[0]
+
+        if (richest && richest.sol > transferAmount + 0.01) {
+          try {
+            const fromKeypair = Keypair.fromSecretKey(Uint8Array.from(richest.wallet.secret))
+            await transferSol(rpcUrlNow, fromKeypair, result.keypair.publicKey.toBase58(), transferAmount)
+            pushToast({ tone: 'success', title: `Đã chuyển ${transferAmount.toFixed(4)} SOL sang ví mới` })
+          } catch {
+            // Transfer failed — request airdrop from backend.
+            const eligibility = await checkAirdropEligibility(tgId)
+            if (!eligibility.canReceive) {
+              pushToast({
+                tone: 'error',
+                title: 'Giới hạn airdrop',
+                body: `Đã nhận ${eligibility.received}/${eligibility.limit} SOL trong ${eligibility.windowDays} ngày`,
+              })
+            } else {
+              await requestAirdrop(result.keypair.publicKey.toBase58(), tgId, rpcUrlNow)
+              pushToast({ tone: 'info', title: 'Đang chờ airdrop SOL…' })
+              await waitForAirdrop(result.keypair.publicKey.toBase58())
+            }
+          }
+        } else {
+          // Not enough SOL — request airdrop from backend.
+          const eligibility = await checkAirdropEligibility(tgId)
+          if (!eligibility.canReceive) {
+            pushToast({
+              tone: 'error',
+              title: 'Giới hạn airdrop',
+              body: `Đã nhận ${eligibility.received}/${eligibility.limit} SOL trong ${eligibility.windowDays} ngày`,
+            })
+          } else {
+            await requestAirdrop(result.keypair.publicKey.toBase58(), tgId, rpcUrlNow)
+            pushToast({ tone: 'info', title: 'Đang chờ airdrop SOL…' })
+            await waitForAirdrop(result.keypair.publicKey.toBase58())
+          }
+        }
+      }
+
       const wallet = await importResultToWallet(result, name || '')
       pushToast({
         tone: 'success',
         title: 'Đã thêm ví',
         body: wallet.address,
       })
+
+      // Auto-backup to Telegram.
+      if (inTelegram && tgId) {
+        const updatedVault = vaultRef.current
+        if (updatedVault) {
+          void uploadTgBackup(tgId, {
+            wallets: updatedVault.wallets,
+            contacts: updatedVault.contacts,
+            prefs: updatedVault.prefs,
+            txMeta: updatedVault.txMeta,
+            samples: updatedVault.samples,
+          }).catch(() => undefined)
+        }
+      }
       return wallet
     },
     [importResultToWallet, pushToast],
@@ -454,8 +571,37 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setHistory([])
       await persist({ ...current, activeWalletId: id })
       seenRef.current = new Set()
+
+      // Check SOL balance of the newly active wallet — request airdrop if low.
+      const wallet = current.wallets.find((w) => w.id === id)
+      if (wallet && isTelegramWebApp()) {
+        const tgId = getTelegramUserIdString()
+        const rpcUrlNow = current.prefs.rpcUrl || DEFAULT_RPC_URL
+        try {
+          const sol = await getSolBalance(rpcUrlNow, wallet.address)
+          if (sol < 0.05 && tgId) {
+            const eligibility = await checkAirdropEligibility(tgId)
+            if (eligibility.canReceive) {
+              pushToast({ tone: 'info', title: 'SOL thấp', body: 'Đang yêu cầu airdrop SOL…' })
+              void requestAirdrop(wallet.address, tgId, rpcUrlNow).then(() => {
+                void waitForAirdrop(wallet.address).then(() => {
+                  pushToast({ tone: 'success', title: 'Đã nhận SOL', body: 'Ví đã được nạp phí gas' })
+                }).catch(() => undefined)
+              }).catch(() => undefined)
+            } else {
+              pushToast({
+                tone: 'error',
+                title: 'Giới hạn airdrop',
+                body: `Đã nhận ${eligibility.received}/${eligibility.limit} SOL trong ${eligibility.windowDays} ngày`,
+              })
+            }
+          }
+        } catch {
+          /* ignore balance check failure */
+        }
+      }
     },
-    [persist],
+    [persist, pushToast],
   )
 
   const renameWallet = useCallback(
@@ -614,11 +760,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     await Promise.all([refreshBalance(), refreshHistory({ silent: true })])
   }, [refreshBalance, refreshHistory])
 
-  // --- SOL airdrop ----------------------------------------------------------
+  // --- SOL airdrop status check --------------------------------------------
   const checkAirdrop = useCallback(
-    async (address: string, rpcUrl: string) => {
+    async (address: string) => {
       try {
-        const info = await initAirdrop(address, rpcUrl, getOrCreateDeviceId())
+        const info = await fetchAirdropStatus(address)
         const status = (info.status === 'none' ? 'idle' : info.status) as AirdropState['status']
         lastAirdropStatusRef.current = status
         setAirdrop({
@@ -627,15 +773,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           signature: info.signature,
           error: info.error,
         })
-        if (status === 'pending' || status === 'sending') {
-          pushToast({ tone: 'info', title: 'Đang chờ airdrop SOL', body: 'Payserver sẽ chuyển 1 SOL phí gas' })
-        }
       } catch {
         lastAirdropStatusRef.current = 'idle'
         setAirdrop({ status: 'idle', payserver: null, signature: null, error: null })
       }
     },
-    [pushToast],
+    [],
   )
 
   // Poll airdrop status while pending or sending.
@@ -659,8 +802,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (status === 'confirmed') {
         if (prefs.sound) ringIncoming()
         vibrate([90, 60, 90])
-        if (prefs.notifications) showSystemNotification('Đã nhận 1 SOL', 'Payserver đã chuyển SOL phí gas')
-        pushToast({ tone: 'success', title: 'Đã nhận 1 SOL', body: 'Ví đã được nạp phí gas' })
+        if (prefs.notifications) showSystemNotification('Đã nhận SOL', 'Payserver đã chuyển SOL phí gas')
+        pushToast({ tone: 'success', title: 'Đã nhận SOL', body: 'Ví đã được nạp phí gas' })
         void refresh()
       } else if (status === 'error') {
         pushToast({ tone: 'error', title: 'Airdrop thất bại', body: info.error || 'Không nhận được SOL' })
@@ -674,8 +817,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (session !== 'unlocked') return
     const wallet = activeWallet
     if (!wallet) return
-    const rpcUrlNow = prefs.rpcUrl || DEFAULT_RPC_URL
-    void checkAirdrop(wallet.address, rpcUrlNow)
+    void checkAirdrop(wallet.address)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, activeWallet?.id, prefs.rpcUrl])
 
@@ -738,6 +880,45 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   })
 
   const realtimeConnected = session === 'unlocked' && !!activeAddress
+
+  // --- auto-balance SOL across wallets (Telegram only) ---------------------
+  useEffect(() => {
+    if (session !== 'unlocked' || !isTelegramWebApp()) return
+    const tgId = getTelegramUserIdString()
+    const timer = window.setInterval(async () => {
+      const current = vaultRef.current
+      if (!current || current.wallets.length < 2) return
+      const rpcUrlNow = current.prefs.rpcUrl || DEFAULT_RPC_URL
+      try {
+        const balances = await Promise.all(
+          current.wallets.map(async (w) => ({
+            wallet: w,
+            sol: await getSolBalance(rpcUrlNow, w.address),
+          })),
+        )
+        const poorest = balances.filter((b) => b.sol < 0.05).sort((a, b) => a.sol - b.sol)[0]
+        if (!poorest) return
+        const richest = balances.sort((a, b) => b.sol - a.sol)[0]
+        if (!richest || richest.sol < 0.1 || richest.wallet.id === poorest.wallet.id) {
+          // No wallet has enough to share — request airdrop from backend.
+          if (tgId) {
+            const eligibility = await checkAirdropEligibility(tgId)
+            if (eligibility.canReceive) {
+              void requestAirdrop(poorest.wallet.address, tgId, rpcUrlNow).catch(() => undefined)
+            }
+          }
+          return
+        }
+        const transferAmount = Math.min(0.05, (richest.sol - 0.05) / 2)
+        if (transferAmount <= 0.001) return
+        const fromKeypair = Keypair.fromSecretKey(Uint8Array.from(richest.wallet.secret))
+        await transferSol(rpcUrlNow, fromKeypair, poorest.wallet.address, transferAmount)
+      } catch {
+        /* ignore balance errors */
+      }
+    }, 60000)
+    return () => window.clearInterval(timer)
+  }, [session])
 
   // --- initial load on unlock / wallet switch ---
   useEffect(() => {
@@ -818,6 +999,23 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(backupTimer.current)
   }, [session, vault?.contacts, vault?.wallets, vault?.txMeta, vault?.prefs, vault?.cloudBackup, backupNow])
 
+  // --- auto-backup to Telegram ID -------------------------------------------
+  useEffect(() => {
+    if (session !== 'unlocked' || !vault?.wallets.length) return
+    const tgId = getTelegramUserIdString()
+    if (!tgId || !isTelegramWebApp()) return
+    const timer = window.setTimeout(() => {
+      void uploadTgBackup(tgId, {
+        wallets: vault.wallets,
+        contacts: vault.contacts,
+        prefs: vault.prefs,
+        txMeta: vault.txMeta,
+        samples: vault.samples,
+      }).catch(() => undefined)
+    }, 5000)
+    return () => window.clearTimeout(timer)
+  }, [session, vault?.wallets, vault?.contacts, vault?.txMeta])
+
   const restoreFromCloud = useCallback(
     async (input: string) => {
       const { keypair } = await importSecret(input)
@@ -865,6 +1063,55 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         body: `${wallets.length} ví đã được phục hồi`,
       })
       return wallets.length
+    },
+    [pushToast],
+  )
+
+  // --- restore from Telegram ID -------------------------------------------
+  const restoreFromTelegram = useCallback(
+    async (telegramId: string): Promise<number> => {
+      const payload = await downloadTgBackup(telegramId)
+      if (!payload) throw new Error('Không tìm thấy bản sao lưu cho Telegram ID này')
+
+      const restoredWallets = (payload.wallets || []) as WalletRecord[]
+      if (!restoredWallets.length) throw new Error('Bản sao lưu không có ví nào')
+      if (restoredWallets.length > MAX_WALLETS) {
+        throw new Error(`Bản sao lưu có ${restoredWallets.length} ví, vượt giới hạn ${MAX_WALLETS} ví`)
+      }
+
+      const vaultKey = newVaultKey()
+      const data = emptyVault(loadPrefsMirror())
+      data.wallets = restoredWallets
+      data.activeWalletId = restoredWallets[0].id
+      data.contacts = (payload.contacts || []) as Contact[]
+      data.txMeta = (payload.txMeta || {}) as VaultData['txMeta']
+      data.samples = (payload.samples || []) as BalanceSample[]
+      data.cloudBackup = true
+      data.lastBackupAt = payload.savedAt || Date.now()
+
+      const created = await createVaultStore(restoredWallets[0], vaultKey, data)
+      for (const wallet of restoredWallets.slice(1)) {
+        const wrap = await buildKeyWrap(wallet.id, Uint8Array.from(wallet.secret), vaultKey)
+        created.keyWraps[wallet.id] = wrap.envelope
+      }
+      created.index = restoredWallets.map(toIndex)
+      saveStore(created)
+      setStore(created)
+      vaultKeyRef.current = vaultKey
+      setVault(data)
+      vaultRef.current = data
+
+      const restoreDeviceId = getOrCreateDeviceId()
+      for (const w of restoredWallets) {
+        void registerWalletWithServer(restoreDeviceId, w.address)
+      }
+      seenRef.current = new Set()
+      pushToast({
+        tone: 'success',
+        title: 'Đã khôi phục ví từ Telegram',
+        body: `${restoredWallets.length} ví đã được phục hồi`,
+      })
+      return restoredWallets.length
     },
     [pushToast],
   )
@@ -1008,6 +1255,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     extendAutoLock: extend,
     backupNow,
     restoreFromCloud,
+    restoreFromTelegram,
     pushToast,
     dismissToast,
     exportSecrets,

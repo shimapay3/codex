@@ -9,10 +9,11 @@ import {
   Wallet,
   Copy,
   Check,
+  AlertTriangle,
 } from 'lucide-react'
 import Logo from './Logo'
 import { useWallet } from '../state/WalletProvider'
-import { USDC_AVATAR, USDC_MINT, MAX_WALLETS } from '../lib/solana'
+import { USDC_AVATAR, USDC_MINT, MAX_WALLETS, getSolBalance, DEFAULT_RPC_URL } from '../lib/solana'
 import {
   getTelegramDisplayName,
   getTelegramUsername,
@@ -24,8 +25,8 @@ import { copyToClipboard } from '../lib/format'
 
 type Step = 'welcome' | 'method' | 'import' | 'restore' | 'secure'
 
-export default function Onboarding() {
-  const { createWallet, restoreFromCloud, setPin, wallets, pushToast, completeOnboarding, telegramUser } =
+export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
+  const { createWallet, restoreFromCloud, restoreFromTelegram, setPin, wallets, pushToast, completeOnboarding, telegramUser } =
     useWallet()
   const [step, setStep] = useState<Step>('welcome')
   const [secret, setSecret] = useState('')
@@ -34,6 +35,7 @@ export default function Onboarding() {
   const [pin, setPinValue] = useState('')
   const [pin2, setPin2] = useState('')
   const [copied, setCopied] = useState(false)
+  const [solWarning, setSolWarning] = useState<string | null>(null)
 
   const tgName = getTelegramDisplayName()
   const tgUsername = getTelegramUsername()
@@ -64,37 +66,53 @@ export default function Onboarding() {
         </p>
       </div>
 
-      {/* Telegram user identity card */}
-      <div className="mt-5 flex items-center gap-3 rounded-[22px] glass-strong p-4">
-        <img
-          src={tgPhoto || TELEGRAM_LOGO}
-          alt="Telegram"
-          className="h-12 w-12 rounded-full ring-2 ring-[#229ED9]/40"
-          onError={(e) => {
-            ;(e.target as HTMLImageElement).src = TELEGRAM_LOGO
-          }}
-        />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-semibold">{tgName}</p>
-          <p className="truncate text-[11px] text-[color:var(--muted)]">
-            {tgUsername || 'Object None'}
-          </p>
+      {/* Telegram user identity card — only in Telegram */}
+      {inTelegram && (
+        <div className="mt-5 flex items-center gap-3 rounded-[22px] glass-strong p-4">
+          <img
+            src={tgPhoto || TELEGRAM_LOGO}
+            alt="Telegram"
+            className="h-12 w-12 rounded-full ring-2 ring-[#229ED9]/40"
+            onError={(e) => {
+              ;(e.target as HTMLImageElement).src = TELEGRAM_LOGO
+            }}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[14px] font-semibold">{tgName}</p>
+            <p className="truncate text-[11px] text-[color:var(--muted)]">
+              {tgUsername || 'Object None'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              if (tgId) {
+                await copyToClipboard(tgId)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 1600)
+              }
+            }}
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[color:var(--border)] px-2.5 py-1.5 text-[10.5px] font-semibold"
+          >
+            {copied ? <Check size={12} /> : <Copy size={12} />}
+            {tgId ? `ID: ${tgId}` : 'Object None'}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={async () => {
-            if (tgId) {
-              await copyToClipboard(tgId)
-              setCopied(true)
-              setTimeout(() => setCopied(false), 1600)
-            }
-          }}
-          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[color:var(--border)] px-2.5 py-1.5 text-[10.5px] font-semibold"
-        >
-          {copied ? <Check size={12} /> : <Copy size={12} />}
-          {tgId ? `ID: ${tgId}` : 'Object None'}
-        </button>
-      </div>
+      )}
+
+      {/* Non-Telegram notice */}
+      {!inTelegram && (
+        <div className="mt-5 flex items-start gap-3 rounded-[22px] border border-[#f0ad4e]/30 bg-[#f0ad4e]/10 p-4">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-[#f0ad4e]" />
+          <div>
+            <p className="text-[13px] font-semibold text-[#f0ad4e]">Chế độ hạn chế</p>
+            <p className="mt-1 text-[11.5px] leading-relaxed text-[color:var(--muted)]">
+              Bạn đang mở ngoài Telegram. Chỉ có thể nhập ví bằng khoá bí mật.
+              Mở trong Telegram để tạo ví mới, nhận airdrop SOL và khôi phục ví.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 flex-1">
         {step === 'welcome' && (
@@ -117,9 +135,9 @@ export default function Onboarding() {
             <ul className="space-y-2.5 rounded-[26px] glass p-5">
               {[
                 { icon: <Wallet size={16} />, text: 'Nhiều ví, chuyển đổi tức thì' },
-                { icon: <ShieldCheck size={16} />, text: 'Bảo mật bằng Telegram + mã PIN' },
+                { icon: <ShieldCheck size={16} />, text: inTelegram ? 'Bảo mật bằng Telegram + mã PIN' : 'Nhập ví bằng khoá bí mật' },
                 { icon: <Sparkles size={16} />, text: 'MEMO đẹp, danh mục màu, lời chúc' },
-                { icon: <CloudDownload size={16} />, text: 'Tự động sao lưu đám mây mã hoá' },
+                ...(inTelegram ? [{ icon: <CloudDownload size={16} />, text: 'Khôi phục ví bằng Telegram ID' }] : []),
               ].map((item) => (
                 <li key={item.text} className="flex items-center gap-3 text-[13px]">
                   <span className="flex h-8 w-8 items-center justify-center rounded-xl accent-gradient text-white">
@@ -142,27 +160,31 @@ export default function Onboarding() {
 
         {step === 'method' && (
           <div className="space-y-2.5">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                run(async () => {
-                  await createWallet(undefined, 'Ví chính')
-                  pushToast({ tone: 'success', title: 'Đã tạo ví mới' })
-                  setStep('secure')
-                })
-              }
-              className="flex w-full items-center gap-3 rounded-2xl accent-gradient px-4 py-4 text-left text-white shadow-glow disabled:opacity-60"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
-                {busy ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={19} />}
-              </span>
-              <span>
-                <span className="block text-[14px] font-semibold">Tạo ví mới</span>
-                <span className="block text-[11px] opacity-85">Sinh khoá bí mật trên thiết bị này</span>
-              </span>
-            </button>
+            {/* Create new wallet — only in Telegram */}
+            {inTelegram && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  run(async () => {
+                    await createWallet(undefined, 'Ví chính')
+                    pushToast({ tone: 'success', title: 'Đã tạo ví mới' })
+                    setStep('secure')
+                  })
+                }
+                className="flex w-full items-center gap-3 rounded-2xl accent-gradient px-4 py-4 text-left text-white shadow-glow disabled:opacity-60"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+                  {busy ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={19} />}
+                </span>
+                <span>
+                  <span className="block text-[14px] font-semibold">Tạo ví mới</span>
+                  <span className="block text-[11px] opacity-85">Nhận 10 SOL airdrop phí gas</span>
+                </span>
+              </button>
+            )}
 
+            {/* Import wallet by keypair/passphrase/privatekey — for everyone */}
             <button
               type="button"
               onClick={() => setStep('import')}
@@ -179,21 +201,36 @@ export default function Onboarding() {
               </span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setStep('restore')}
-              className="flex w-full items-center gap-3 rounded-2xl border border-[color:var(--border)] px-4 py-4 text-left"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--surface-strong)]">
-                <CloudDownload size={19} />
-              </span>
-              <span>
-                <span className="block text-[14px] font-semibold">Khôi phục từ đám mây</span>
-                <span className="block text-[11px] text-[color:var(--muted)]">
-                  Bằng khoá bí mật của ví đã sao lưu
+            {/* Restore by Telegram ID — only in Telegram */}
+            {inTelegram && (
+              <button
+                type="button"
+                disabled={busy || !tgId}
+                onClick={() =>
+                  run(async () => {
+                    if (!tgId) return
+                    const count = await restoreFromTelegram(tgId)
+                    if (count > 0) {
+                      pushToast({ tone: 'success', title: `Đã khôi phục ${count} ví` })
+                      setStep('secure')
+                    } else {
+                      setError('Không tìm thấy bản sao lưu cho Telegram ID này')
+                    }
+                  })
+                }
+                className="flex w-full items-center gap-3 rounded-2xl border border-[color:var(--border)] px-4 py-4 text-left disabled:opacity-50"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--surface-strong)]">
+                  {busy ? <Loader2 size={18} className="animate-spin" /> : <CloudDownload size={19} />}
                 </span>
-              </span>
-            </button>
+                <span>
+                  <span className="block text-[14px] font-semibold">Khôi phục ví bằng Telegram</span>
+                  <span className="block text-[11px] text-[color:var(--muted)]">
+                    Tự động phục hồi tất cả ví từ ID Telegram
+                  </span>
+                </span>
+              </button>
+            )}
 
             {error && (
               <p className="rounded-2xl border border-[#ff6b81]/40 bg-[#ff6b81]/10 px-3.5 py-3 text-[12px] text-[#ff8fa1]">
@@ -202,7 +239,7 @@ export default function Onboarding() {
             )}
 
             <p className="text-center text-[10.5px] leading-relaxed text-[color:var(--muted)]">
-              Giới hạn {MAX_WALLETS} ví cho mỗi thiết bị · Cloud Chain
+              {inTelegram ? `Giới hạn ${MAX_WALLETS} ví · Cloud Chain` : 'Chế độ hạn chế — mở trong Telegram để đầy đủ tính năng'}
             </p>
           </div>
         )}
@@ -247,8 +284,18 @@ export default function Onboarding() {
                 disabled={busy || !secret.trim()}
                 onClick={() =>
                   run(async () => {
-                    if (step === 'import') await createWallet(secret, 'Ví của tôi')
-                    else await restoreFromCloud(secret)
+                    if (step === 'import') {
+                      await createWallet(secret, 'Ví của tôi')
+                      // Check SOL balance after import — warn if insufficient
+                      try {
+                        const sol = await getSolBalance(DEFAULT_RPC_URL, (await import('../lib/crypto')).importSecret(secret).then(r => r.keypair.publicKey.toBase58()).catch(() => ''))
+                        if (sol < 0.05) {
+                          setSolWarning(`Ví chỉ có ${sol.toFixed(6)} SOL — không đủ phí gas. Mở trong Telegram để nhận airdrop SOL.`)
+                        }
+                      } catch { /* ignore balance check failure */ }
+                    } else {
+                      await restoreFromCloud(secret)
+                    }
                     setStep('secure')
                   })
                 }
@@ -258,6 +305,13 @@ export default function Onboarding() {
                 {step === 'import' ? 'Nhập ví' : 'Khôi phục'}
               </button>
             </div>
+
+            {solWarning && (
+              <div className="flex items-start gap-2 rounded-2xl border border-[#f0ad4e]/30 bg-[#f0ad4e]/10 px-3.5 py-3 text-[11.5px] text-[#f0ad4e]">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                <span>{solWarning}</span>
+              </div>
+            )}
           </div>
         )}
 

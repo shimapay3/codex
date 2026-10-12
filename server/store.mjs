@@ -8,8 +8,9 @@ const FILE = path.join(DATA_DIR, 'store.json')
 
 let state = {
   backups: {},
+  tgBackups: {},
   watches: {},
-  airdrops: { records: {}, ipLog: {}, dailyCount: 0, dailyResetAt: 0 },
+  airdrops: { records: {}, userAirdrops: {} },
   wallets: { devices: {} },
 }
 
@@ -29,7 +30,8 @@ export function load() {
     state = {
       backups: parsed.backups && typeof parsed.backups === 'object' ? parsed.backups : {},
       watches: parsed.watches && typeof parsed.watches === 'object' ? parsed.watches : {},
-      airdrops: parsed.airdrops && typeof parsed.airdrops === 'object' ? parsed.airdrops : { records: {}, ipLog: {}, dailyCount: 0, dailyResetAt: 0 },
+      airdrops: parsed.airdrops && typeof parsed.airdrops === 'object' ? parsed.airdrops : { records: {}, userAirdrops: {} },
+      tgBackups: parsed.tgBackups && typeof parsed.tgBackups === 'object' ? parsed.tgBackups : {},
       wallets: parsed.wallets && typeof parsed.wallets === 'object' ? parsed.wallets : { devices: {} },
     }
   } catch {

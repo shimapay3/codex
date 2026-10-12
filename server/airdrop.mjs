@@ -8,13 +8,11 @@ const require = createRequire(import.meta.url)
 const { Keypair, SystemProgram, Transaction, PublicKey, LAMPORTS_PER_SOL } = require('@solana/web3.js')
 
 const KEYPAIR_PATH = process.env.SOLANA_KEYPAIR_PATH || '/root/.config/solana/id.json'
-const AIRDROP_LAMPORTS = 1 * LAMPORTS_PER_SOL
-const MIN_BALANCE_LAMPORTS = 1 * LAMPORTS_PER_SOL
-const MAX_AIRDROPS_PER_DAY = Number(process.env.AIRDROP_DAILY_LIMIT || 100)
-const MAX_PER_IP_PER_HOUR = 3
-const MAX_AIRDROPS_PER_DEVICE = 2
+const AIRDROP_LAMPORTS = 10 * LAMPORTS_PER_SOL
+const MAX_AIRDROP_LAMPORTS = 10 * LAMPORTS_PER_SOL
+const WINDOW_MS = 3 * 24 * 60 * 60 * 1000
 const CRON_MS = Number(process.env.AIRDROP_CRON_MS || 15000)
-const CONFIRM_TIMEOUT_MS = 60000
+const CONFIRM_TIMEOUT_MS = 90000
 
 let payserverKeypair = null
 
@@ -59,41 +57,24 @@ function loadKeypair() {
 function getAirdropState() {
   const state = getState()
   if (!state.airdrops) {
-    state.airdrops = { records: {}, ipLog: {}, dailyCount: 0, dailyResetAt: 0 }
+    state.airdrops = { records: {}, userAirdrops: {} }
   }
+  if (!state.airdrops.userAirdrops) state.airdrops.userAirdrops = {}
   return state.airdrops
 }
 
-function isRateLimited(ip) {
+/** Sum airdrop lamports for a Telegram user in the last 3 days. */
+function getUserAirdropTotal(telegramId) {
   const st = getAirdropState()
-  const now = Date.now()
-  const hourAgo = now - 3_600_000
-  if (!st.ipLog[ip]) st.ipLog[ip] = []
-  st.ipLog[ip] = st.ipLog[ip].filter((t) => t > hourAgo)
-  return st.ipLog[ip].length >= MAX_PER_IP_PER_HOUR
-}
-
-function recordIpRequest(ip) {
-  const st = getAirdropState()
-  if (!st.ipLog[ip]) st.ipLog[ip] = []
-  st.ipLog[ip].push(Date.now())
-  save()
-}
-
-function checkDailyLimit() {
-  const st = getAirdropState()
-  const now = Date.now()
-  if (now - (st.dailyResetAt || 0) > 86_400_000) {
-    st.dailyCount = 0
-    st.dailyResetAt = now
+  const entries = st.userAirdrops[telegramId] || []
+  const cutoff = Date.now() - WINDOW_MS
+  const recent = entries.filter((e) => e.timestamp > cutoff)
+  // Prune old entries
+  if (recent.length !== entries.length) {
+    st.userAirdrops[telegramId] = recent
+    save()
   }
-  return st.dailyCount >= MAX_AIRDROPS_PER_DAY
-}
-
-function incrementDailyCount() {
-  const st = getAirdropState()
-  st.dailyCount = (st.dailyCount || 0) + 1
-  save()
+  return recent.reduce((sum, e) => sum + e.amount, 0)
 }
 
 async function getSolBalanceLamports(rpcUrl, address) {
@@ -165,15 +146,6 @@ async function processQueue(rpcUrl) {
     for (const [address, record] of pending) {
       if (record.status === 'sending') continue
       try {
-        const balance = await getSolBalanceLamports(rpcUrl, address)
-        if (balance >= MIN_BALANCE_LAMPORTS) {
-          record.status = 'confirmed'
-          record.confirmedAt = Date.now()
-          record.skipped = true
-          save()
-          continue
-        }
-
         record.status = 'sending'
         record.sendingAt = Date.now()
         save()
@@ -189,6 +161,15 @@ async function processQueue(rpcUrl) {
           if (result.confirmed) {
             r.status = 'confirmed'
             r.confirmedAt = Date.now()
+            // Record in user totals
+            if (r.telegramId) {
+              if (!s.userAirdrops[r.telegramId]) s.userAirdrops[r.telegramId] = []
+              s.userAirdrops[r.telegramId].push({
+                amount: AIRDROP_LAMPORTS,
+                timestamp: Date.now(),
+                address,
+              })
+            }
           } else {
             r.status = 'error'
             r.error = result.error
@@ -221,21 +202,25 @@ export function startAirdropCron() {
   cronTimer = setInterval(tick, CRON_MS)
   cronTimer.unref?.()
   void tick()
-  console.log(`[airdrop] cron started (interval ${CRON_MS}ms)`)
+  console.log(`[airdrop] cron started (interval ${CRON_MS}ms, 10 SOL per user / 3 days)`)
 }
 
-export async function handleAirdropInit(req, res) {
+/** POST /api/airdrop/request — request 10 SOL airdrop for a new Telegram user. */
+export async function handleAirdropRequest(req, res) {
   const address = req.body?.address
-  if (!address || typeof address !== 'string' || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
+  const telegramId = req.body?.telegramId
+  const rpcUrl = sanitizeRpcUrl(req.body?.rpcUrl) || DEFAULT_RPC
+
+  if (!address || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
     res.status(400).json({ error: 'Địa chỉ ví không hợp lệ' })
     return
   }
+  if (!telegramId || typeof telegramId !== 'string') {
+    res.status(400).json({ error: 'Thiếu Telegram user ID' })
+    return
+  }
 
-  const ip = req.ip || req.socket?.remoteAddress || 'unknown'
-  const deviceId = req.body?.deviceId || ''
-  const rpcUrl = sanitizeRpcUrl(req.body?.rpcUrl) || DEFAULT_RPC
   const st = getAirdropState()
-
   const existing = st.records[address]
   if (existing) {
     const kp = loadKeypair()
@@ -250,38 +235,24 @@ export async function handleAirdropInit(req, res) {
     return
   }
 
-  if (isRateLimited(ip)) {
-    res.status(429).json({ error: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.' })
+  // Check 3-day limit
+  const totalReceived = getUserAirdropTotal(telegramId)
+  const remaining = MAX_AIRDROP_LAMPORTS - totalReceived
+  if (remaining < AIRDROP_LAMPORTS) {
+    res.status(403).json({
+      error: `Đã đạt giới hạn airdrop ${MAX_AIRDROP_LAMPORTS / LAMPORTS_PER_SOL} SOL trong 3 ngày`,
+      canReceive: false,
+      received: totalReceived / LAMPORTS_PER_SOL,
+      limit: MAX_AIRDROP_LAMPORTS / LAMPORTS_PER_SOL,
+      remaining: remaining / LAMPORTS_PER_SOL,
+    })
     return
   }
-
-  if (checkDailyLimit()) {
-    res.status(429).json({ error: 'Đã đạt giới hạn airdrop trong ngày' })
-    return
-  }
-
-  // SOL farming abuse detection: limit airdrops per device
-  if (deviceId) {
-    if (!st.deviceAirdrops) st.deviceAirdrops = {}
-    const deviceCount = st.deviceAirdrops[deviceId] || 0
-    if (deviceCount >= MAX_AIRDROPS_PER_DEVICE) {
-      console.warn(`[airdrop] device ${deviceId} blocked: ${deviceCount} airdrops already`)
-      res.status(403).json({
-        error: `Đã nhận ${MAX_AIRDROPS_PER_DEVICE} airdrop SOL cho tài khoản Telegram này`,
-      })
-      return
-    }
-    st.deviceAirdrops[deviceId] = deviceCount + 1
-  }
-
-  recordIpRequest(ip)
-  incrementDailyCount()
 
   st.records[address] = {
     status: 'pending',
     address,
-    ip,
-    deviceId: deviceId || null,
+    telegramId,
     createdAt: Date.now(),
     signature: null,
     confirmedAt: null,
@@ -297,9 +268,30 @@ export async function handleAirdropInit(req, res) {
     signature: null,
     confirmedAt: null,
     error: null,
+    canReceive: true,
+    remaining: remaining / LAMPORTS_PER_SOL,
   })
 
   void processQueue(rpcUrl)
+}
+
+/** GET /api/airdrop/eligibility/:telegramId — check airdrop eligibility. */
+export function handleAirdropEligibility(req, res) {
+  const telegramId = req.params.telegramId
+  if (!telegramId || typeof telegramId !== 'string') {
+    res.status(400).json({ error: 'Thiếu Telegram user ID' })
+    return
+  }
+
+  const totalReceived = getUserAirdropTotal(telegramId)
+  const remaining = MAX_AIRDROP_LAMPORTS - totalReceived
+  res.json({
+    canReceive: remaining >= AIRDROP_LAMPORTS,
+    received: totalReceived / LAMPORTS_PER_SOL,
+    limit: MAX_AIRDROP_LAMPORTS / LAMPORTS_PER_SOL,
+    remaining: Math.max(0, remaining) / LAMPORTS_PER_SOL,
+    windowDays: 3,
+  })
 }
 
 export function handleAirdropStatus(req, res) {
@@ -331,7 +323,9 @@ export function handleAirdropInfo(_req, res) {
   const kp = loadKeypair()
   res.json({
     payserver: kp.publicKey.toBase58(),
-    airdropAmount: 1,
+    airdropAmount: 10,
     currency: 'SOL',
+    maxPerUser: 10,
+    windowDays: 3,
   })
 }

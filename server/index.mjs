@@ -2,7 +2,7 @@ import http from 'node:http'
 import express from 'express'
 import { DEFAULT_RPC, handleRpcProxy } from './rpc.mjs'
 import { startWatcher } from './watcher.mjs'
-import { startAirdropCron, handleAirdropInit, handleAirdropStatus, handleAirdropInfo } from './airdrop.mjs'
+import { startAirdropCron, handleAirdropRequest, handleAirdropStatus, handleAirdropInfo, handleAirdropEligibility } from './airdrop.mjs'
 import { handleRealtime } from './realtime.mjs'
 import { getState, load, save } from './store.mjs'
 
@@ -34,7 +34,8 @@ app.post('/api/rpc', handleRpcProxy)
 // The payserver holds a funded keypair and sends 1 SOL to new wallets that
 // have no gas budget. Rate-limited and deduplicated to prevent abuse.
 
-app.post('/api/airdrop/init', handleAirdropInit)
+app.post('/api/airdrop/request', handleAirdropRequest)
+app.get('/api/airdrop/eligibility/:telegramId', handleAirdropEligibility)
 app.get('/api/airdrop/status/:address', handleAirdropStatus)
 app.get('/api/airdrop/info', handleAirdropInfo)
 
@@ -235,6 +236,72 @@ app.delete('/api/backup/:address', (req, res) => {
     return
   }
   delete getState().backups[address]
+  save()
+  res.json({ ok: true })
+})
+
+// --- Telegram ID-based cloud backup -----------------------------------------
+// Backups are stored by Telegram user ID and encrypted client-side with a key
+// derived from the Telegram user ID. This allows wallet state restoration
+// with just a Telegram login — no wallet secret needed.
+
+function normalizeTelegramId(value) {
+  return typeof value === 'string' && /^\d{1,20}$/.test(value) ? value : null
+}
+
+app.get('/api/tg-backup/:telegramId', (req, res) => {
+  const tgId = normalizeTelegramId(req.params.telegramId)
+  if (!tgId) {
+    res.status(400).json({ error: 'Telegram ID không hợp lệ' })
+    return
+  }
+  const state = getState()
+  if (!state.tgBackups) state.tgBackups = {}
+  const record = state.tgBackups[tgId]
+  if (!record) {
+    res.status(404).json({ error: 'Chưa có bản sao lưu cho Telegram ID này' })
+    return
+  }
+  res.json(record)
+})
+
+app.put('/api/tg-backup/:telegramId', (req, res) => {
+  const tgId = normalizeTelegramId(req.params.telegramId)
+  if (!tgId) {
+    res.status(400).json({ error: 'Telegram ID không hợp lệ' })
+    return
+  }
+  const { ciphertext, iv, version, label } = req.body || {}
+  if (typeof ciphertext !== 'string' || typeof iv !== 'string') {
+    res.status(400).json({ error: 'Bản sao lưu không hợp lệ' })
+    return
+  }
+  if (ciphertext.length > 900000) {
+    res.status(413).json({ error: 'Bản sao lưu quá lớn' })
+    return
+  }
+  const state = getState()
+  if (!state.tgBackups) state.tgBackups = {}
+  state.tgBackups[tgId] = {
+    ciphertext,
+    iv,
+    version: Number(version) || 1,
+    label: typeof label === 'string' ? label.slice(0, 60) : '',
+    updatedAt: Date.now(),
+  }
+  save()
+  res.json({ ok: true, updatedAt: state.tgBackups[tgId].updatedAt })
+})
+
+app.delete('/api/tg-backup/:telegramId', (req, res) => {
+  const tgId = normalizeTelegramId(req.params.telegramId)
+  if (!tgId) {
+    res.status(400).json({ error: 'Telegram ID không hợp lệ' })
+    return
+  }
+  const state = getState()
+  if (!state.tgBackups) state.tgBackups = {}
+  delete state.tgBackups[tgId]
   save()
   res.json({ ok: true })
 })

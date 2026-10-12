@@ -26,6 +26,7 @@ function BootScreen() {
 
 export default function App() {
   const { session } = useWallet()
+  const inTelegram = isTelegramWebApp()
 
   // The first gesture anywhere unlocks audio so payment chimes can ring later.
   useEffect(() => {
@@ -36,22 +37,11 @@ export default function App() {
 
   if (session === 'booting') return <BootScreen />
 
-  // Gate: require Telegram WebApp — show download guide when outside Telegram
-  if (!isTelegramWebApp()) {
-    return (
-      <>
-        <SpaceBackdrop />
-        <TelegramGuide />
-        <Toasts />
-      </>
-    )
-  }
-
   if (session === 'onboarding') {
     return (
       <>
         <SpaceBackdrop />
-        <Onboarding />
+        <Onboarding inTelegram={inTelegram} />
         <Toasts />
       </>
     )

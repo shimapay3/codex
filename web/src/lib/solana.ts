@@ -2,6 +2,7 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  SystemProgram,
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js'
@@ -556,9 +557,7 @@ export async function fetchTransactionSummary(
 
 export type PriceInfo = { usd: number; vnd: number; source: string; fallback?: boolean }
 
-// --- SOL airdrop API -------------------------------------------------------
-// New wallets call the payserver to request 1 SOL for gas. The server
-// rate-limits, deduplicates and processes the queue via cron.
+// --- SOL airdrop API (Telegram-based, 10 SOL per user / 3 days) ------------
 
 export type AirdropStatus = 'none' | 'pending' | 'sending' | 'confirmed' | 'error'
 
@@ -569,20 +568,42 @@ export type AirdropInfo = {
   signature: string | null
   confirmedAt: number | null
   error: string | null
+  canReceive?: boolean
+  remaining?: number
 }
 
-export async function initAirdrop(address: string, rpcUrl: string, deviceId?: string): Promise<AirdropInfo> {
+export type AirdropEligibility = {
+  canReceive: boolean
+  received: number
+  limit: number
+  remaining: number
+  windowDays: number
+}
+
+/** Request 10 SOL airdrop for a new Telegram user's first wallet. */
+export async function requestAirdrop(address: string, telegramId: string, rpcUrl?: string): Promise<AirdropInfo> {
   try {
-    const res = await fetch('/api/airdrop/init', {
+    const res = await fetch('/api/airdrop/request', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ address, rpcUrl, deviceId }),
+      body: JSON.stringify({ address, telegramId, rpcUrl }),
     })
     const json = await res.json()
-    if (!res.ok) throw new Error(json?.error || 'Airdrop init failed')
+    if (!res.ok) throw new Error(json?.error || 'Airdrop request failed')
     return json as AirdropInfo
+  } catch (err: any) {
+    return { status: 'error', address, payserver: '', signature: null, confirmedAt: null, error: err?.message || 'Airdrop failed' }
+  }
+}
+
+export async function checkAirdropEligibility(telegramId: string): Promise<AirdropEligibility> {
+  try {
+    const res = await fetch(`/api/airdrop/eligibility/${encodeURIComponent(telegramId)}`)
+    const json = await res.json()
+    if (!res.ok) throw new Error(json?.error || 'Eligibility check failed')
+    return json as AirdropEligibility
   } catch {
-    return { status: 'none', address, payserver: '', signature: null, confirmedAt: null, error: null }
+    return { canReceive: true, received: 0, limit: 10, remaining: 10, windowDays: 3 }
   }
 }
 
@@ -595,6 +616,34 @@ export async function fetchAirdropStatus(address: string): Promise<AirdropInfo> 
   } catch {
     return { status: 'none', address, payserver: '', signature: null, confirmedAt: null, error: null }
   }
+}
+
+/** Transfer SOL from one wallet to another (client-side signed). */
+export async function transferSol(
+  rpcUrl: string,
+  from: Keypair,
+  toAddress: string,
+  solAmount: number,
+): Promise<string> {
+  const lamports = Math.floor(solAmount * 1_000_000_000)
+  if (lamports <= 0) throw new Error('Số lượng SOL không hợp lệ')
+
+  const recipient = new PublicKey(toAddress)
+  const blockhash = await rpcFetch<any>(rpcUrl, 'getLatestBlockhash', [{ commitment: 'confirmed' }])
+
+  const tx = new Transaction({
+    feePayer: from.publicKey,
+    recentBlockhash: blockhash.value.blockhash,
+  })
+  tx.add(SystemProgram.transfer({ fromPubkey: from.publicKey, toPubkey: recipient, lamports }))
+  tx.sign(from)
+
+  const signature = await rpcFetch<string>(rpcUrl, 'sendTransaction', [
+    tx.serialize().toString('base64'),
+    { encoding: 'base64', skipPreflight: false, preflightCommitment: 'confirmed', maxRetries: 3 },
+  ])
+  await confirmSignature(rpcUrl, signature)
+  return signature
 }
 
 export function formatSolBalance(sol: number): string {
