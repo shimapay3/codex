@@ -187,7 +187,7 @@ export function newVaultKey(): Uint8Array {
   return randomBytes(32)
 }
 
-// --- PIN protection (only enabled once a Passkey authorisation succeeded) ----
+// --- PIN protection (primary unlock method) ----
 
 export type PinWrap = { envelope: Envelope; salt: string; createdAt: number }
 
@@ -224,7 +224,7 @@ export function b64ToBytesSafe(value: string) {
 // --- PIN attempt rate limiting ----------------------------------------------
 // Prevents brute-forcing the 6-digit PIN by locking out after repeated failures.
 // State is stored in localStorage; a determined attacker can clear it, but the
-// server-side wallet limit and passkey requirement are the primary defenses.
+// server-side wallet limit and Telegram identity are the primary defenses.
 
 export type PinAttempts = { count: number; lockedUntil: number; lastAttempt: number }
 

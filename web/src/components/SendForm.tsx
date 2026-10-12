@@ -5,7 +5,6 @@ import {
   BookUser,
   CheckCircle2,
   ExternalLink,
-  Fingerprint,
   Loader2,
   Send as SendIcon,
   Sparkles,
@@ -28,8 +27,6 @@ export default function SendForm() {
     wallets,
     activeWallet,
     pushToast,
-    passkeyRecord,
-    confirmPasskey,
     prefs,
     airdrop,
   } = useWallet()
@@ -70,8 +67,6 @@ export default function SendForm() {
     setBusy(true)
     setError(null)
     try {
-      // Sending money is authorised by Passkey — the same gesture as unlocking.
-      await confirmPasskey()
       setStage('sending')
       const sig = await send({ to: to.trim(), amount, memo, category: categoryId, wish })
       setSignature(sig)
@@ -386,19 +381,14 @@ export default function SendForm() {
             <span className="text-[11px] text-[color:var(--muted)]">MEMO</span>
             <p className="mt-1 text-[13px] font-medium">{memo}</p>
           </div>
-          {passkeyRecord && (
-            <p className="flex items-center gap-1.5 text-[11.5px] text-[color:var(--muted)]">
-              <Fingerprint size={13} /> Xác thực bằng Passkey để ký giao dịch
-            </p>
-          )}
           <button
             type="button"
             disabled={busy}
             onClick={doSend}
             className="flex w-full items-center justify-center gap-2 rounded-2xl accent-gradient py-4 text-[15px] font-semibold text-white shadow-glow disabled:opacity-60"
           >
-            {busy ? <Loader2 size={17} className="animate-spin" /> : <Fingerprint size={17} />}
-            {busy ? 'Đang ký & gửi…' : 'Xác thực Passkey & Gửi'}
+            {busy ? <Loader2 size={17} className="animate-spin" /> : <SendIcon size={17} />}
+            {busy ? 'Đang ký & gửi…' : 'Xác nhận & Gửi'}
           </button>
           <button
             type="button"

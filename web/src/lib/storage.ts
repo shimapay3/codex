@@ -1,3 +1,5 @@
+import { getTelegramDeviceId } from './telegram'
+
 const PREFIX = 'cloudpay.'
 
 export function readLocal<T>(key: string, fallback: T): T {
@@ -37,8 +39,13 @@ export const StorageKeys = {
   pinAttempts: 'pinAttempts.v1',
 } as const
 
-/** Generate or retrieve a stable per-device identifier for server-side wallet limits. */
+/** Generate or retrieve a stable per-device identifier for server-side wallet limits.
+ *  Prefers the Telegram user id when running inside Telegram. */
 export function getOrCreateDeviceId(): string {
+  // Use Telegram user id as device id when available
+  const tgId = getTelegramDeviceId()
+  if (tgId) return tgId
+
   let id = readLocal<string>(StorageKeys.deviceId, '')
   if (!id) {
     id = `dev-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`

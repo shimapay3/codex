@@ -17,6 +17,11 @@ import SettingsPage from '../pages/SettingsPage'
 import ExplorerPage from '../pages/ExplorerPage'
 import { splitMemo } from '../lib/categories'
 import { formatAmount } from '../lib/solana'
+import {
+  getTelegramDisplayName,
+  getTelegramPhotoUrl,
+  TELEGRAM_LOGO,
+} from '../lib/telegram'
 
 function AutoLockBanner() {
   const { autoLockSeconds, extendAutoLock, prefs } = useWallet()
@@ -96,6 +101,8 @@ export default function Shell() {
   const { prefs, setPrefs, balance } = useWallet()
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [themeOpen, setThemeOpen] = useState(false)
+  const tgName = getTelegramDisplayName()
+  const tgPhoto = getTelegramPhotoUrl()
 
   return (
     <>
@@ -106,6 +113,18 @@ export default function Shell() {
             <Link to="/" className="shrink-0">
               <LogoWordmark compact />
             </Link>
+            {/* Telegram avatar */}
+            <div className="flex items-center gap-1.5">
+              <img
+                src={tgPhoto || TELEGRAM_LOGO}
+                alt="Telegram"
+                className="h-7 w-7 rounded-full ring-2 ring-[#229ED9]/30"
+                onError={(e) => { ;(e.target as HTMLImageElement).src = TELEGRAM_LOGO }}
+              />
+              <span className="hidden text-[11px] font-semibold text-[color:var(--muted)] sm:block">
+                {tgName}
+              </span>
+            </div>
             <div className="ml-auto flex items-center gap-1.5">
               <button
                 type="button"

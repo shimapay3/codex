@@ -6,7 +6,9 @@ import LockScreen from './components/LockScreen'
 import Onboarding from './components/Onboarding'
 import Shell from './components/Shell'
 import Logo from './components/Logo'
+import TelegramGuide from './components/TelegramGuide'
 import { primeAudio } from './lib/notify'
+import { isTelegramWebApp } from './lib/telegram'
 
 function BootScreen() {
   return (
@@ -33,6 +35,17 @@ export default function App() {
   }, [])
 
   if (session === 'booting') return <BootScreen />
+
+  // Gate: require Telegram WebApp — show download guide when outside Telegram
+  if (!isTelegramWebApp()) {
+    return (
+      <>
+        <SpaceBackdrop />
+        <TelegramGuide />
+        <Toasts />
+      </>
+    )
+  }
 
   if (session === 'onboarding') {
     return (

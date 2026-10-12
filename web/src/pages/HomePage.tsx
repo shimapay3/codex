@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -20,6 +20,14 @@ import UsdcAvatar from '../components/UsdcAvatar'
 import BalanceChart from '../components/BalanceChart'
 import TxList, { TxDetail } from '../components/TxList'
 import { USDC_MINT } from '../lib/solana'
+import {
+  getTelegramDisplayName,
+  getTelegramUsername,
+  getTelegramUserIdString,
+  getTelegramPhotoUrl,
+  TELEGRAM_LOGO,
+} from '../lib/telegram'
+import { copyToClipboard } from '../lib/format'
 
 export default function HomePage() {
   const {
@@ -36,8 +44,14 @@ export default function HomePage() {
   } = useWallet()
   const [selected, setSelected] = useState<TxEntry | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [tgCopied, setTgCopied] = useState(false)
+  const navigate = useNavigate()
 
   const hidden = prefs.hideBalances
+  const tgName = getTelegramDisplayName()
+  const tgUsername = getTelegramUsername()
+  const tgId = getTelegramUserIdString()
+  const tgPhoto = getTelegramPhotoUrl()
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -64,6 +78,31 @@ export default function HomePage() {
           <span className="flex items-center gap-2 text-[11.5px] font-semibold uppercase tracking-[0.16em] text-[color:var(--muted)]">
             <UsdcAvatar size={22} /> Tổng số dư USDC
           </span>
+          {/* Telegram identity chip */}
+          <button
+            type="button"
+            onClick={async () => {
+              if (tgId) {
+                await copyToClipboard(tgId)
+                setTgCopied(true)
+                setTimeout(() => setTgCopied(false), 1600)
+              }
+            }}
+            className="flex items-center gap-1.5 rounded-full bg-[color:var(--surface)] px-2.5 py-1 text-[10.5px] font-semibold"
+          >
+            <img
+              src={tgPhoto || TELEGRAM_LOGO}
+              alt="TG"
+              className="h-4 w-4 rounded-full"
+              onError={(e) => { ;(e.target as HTMLImageElement).src = TELEGRAM_LOGO }}
+            />
+            <span className="max-w-[80px] truncate">{tgName}</span>
+            {tgId && (
+              <span className="text-[color:var(--muted)]">
+                {tgCopied ? '✓' : `#${tgId.slice(-4)}`}
+              </span>
+            )}
+          </button>
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -156,7 +195,11 @@ export default function HomePage() {
           <span className="text-[10.5px] text-[color:var(--muted)]">2 tài sản</span>
         </div>
         <div className="space-y-2">
-          <div className="flex items-center gap-3 rounded-2xl bg-[color:var(--surface)] p-3">
+          <button
+            type="button"
+            onClick={() => navigate('/receive')}
+            className="flex w-full items-center gap-3 rounded-2xl bg-[color:var(--surface)] p-3 text-left transition hover:bg-[color:var(--surface-strong)] active:scale-[0.99]"
+          >
             <UsdcAvatar size={40} />
             <div className="min-w-0 flex-1">
               <p className="text-[13.5px] font-semibold">USD Coin</p>
@@ -172,8 +215,12 @@ export default function HomePage() {
                 {hidden ? '≈ ••••' : formatVnd(balance.usdc * price.vnd)}
               </p>
             </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-2xl bg-[color:var(--surface)] p-3">
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/send')}
+            className="flex w-full items-center gap-3 rounded-2xl bg-[color:var(--surface)] p-3 text-left transition hover:bg-[color:var(--surface-strong)] active:scale-[0.99]"
+          >
             <img
               src={SOL_ICON}
               alt="Solana"
@@ -198,7 +245,7 @@ export default function HomePage() {
               </p>
               <p className="text-[10.5px] text-[color:var(--muted)]">—</p>
             </div>
-          </div>
+          </button>
         </div>
       </div>
 

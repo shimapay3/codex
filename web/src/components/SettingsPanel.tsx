@@ -5,7 +5,6 @@ import {
   CloudUpload,
   Copy,
   Download,
-  Fingerprint,
   Gauge,
   HardDriveDownload,
   KeyRound,
@@ -23,6 +22,13 @@ import { copyToClipboard, downloadTextFile, formatVnd } from '../lib/format'
 import { notificationsSupported, primeAudio, requestNotificationPermission, ringIncoming } from '../lib/notify'
 import { shortAddress } from '../lib/crypto'
 import { removeLocal } from '../lib/storage'
+import {
+  getTelegramDisplayName,
+  getTelegramUsername,
+  getTelegramUserIdString,
+  getTelegramPhotoUrl,
+  TELEGRAM_LOGO,
+} from '../lib/telegram'
 
 const LOCK_OPTIONS = [5, 10, 15, 20]
 
@@ -87,11 +93,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
     prefs,
     setPrefs,
     price,
-    passkeyRecord,
     pinEnabled,
-    platformAuthAvailable,
-    enablePasskey,
-    disablePasskey,
     setPin,
     clearPin,
     lock,
@@ -105,6 +107,12 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
     pushToast,
     pushToast: toast,
   } = useWallet()
+
+  const tgName = getTelegramDisplayName()
+  const tgUsername = getTelegramUsername()
+  const tgId = getTelegramUserIdString()
+  const tgPhoto = getTelegramPhotoUrl()
+  const [tgCopied, setTgCopied] = useState(false)
 
   const [rpcDraft, setRpcDraft] = useState(prefs.rpcUrl)
   const [endpointDraft, setEndpointDraft] = useState(prefs.priceEndpoint)
@@ -230,53 +238,35 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
         </Row>
       </Section>
 
-      <Section
-        icon={<Fingerprint size={15} />}
-        title="Bảo mật Passkey"
-        hint={
-          platformAuthAvailable
-            ? 'Thiết bị hỗ trợ xác thực nền tảng (FaceID / Touch ID / Windows Hello).'
-            : 'Thiết bị này không có xác thực nền tảng — Passkey vẫn có thể dùng qua khoá bảo mật ngoài.'
-        }
-      >
-        <div className="flex items-center justify-between rounded-2xl bg-[color:var(--surface)] px-3.5 py-3">
-          <span className="text-[12px] text-[color:var(--muted)]">Trạng thái</span>
-          <span className="text-[12.5px] font-semibold">
-            {passkeyRecord
-              ? passkeyRecord.prf
-                ? 'Đã bật · PRF'
-                : 'Đã bật · không PRF'
-              : 'Chưa thiết lập'}
-          </span>
-        </div>
-
-        {passkeyRecord ? (
+      <Section icon={<KeyRound size={15} />} title="Telegram & PIN" hint="Định danh Telegram là cơ sở bảo mật. Mã PIN 4–6 số khoá két ví trên thiết bị.">
+        <div className="flex items-center gap-3 rounded-2xl bg-[color:var(--surface)] px-3.5 py-3">
+          <img
+            src={tgPhoto || TELEGRAM_LOGO}
+            alt="Telegram"
+            className="h-10 w-10 rounded-full ring-2 ring-[#229ED9]/40"
+            onError={(e) => { ;(e.target as HTMLImageElement).src = TELEGRAM_LOGO }}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-semibold">{tgName}</p>
+            <p className="truncate text-[11px] text-[color:var(--muted)]">{tgUsername || 'Object None'}</p>
+          </div>
           <button
             type="button"
             onClick={async () => {
-              await disablePasskey()
-            }}
-            className="w-full rounded-2xl border border-[#ff6b81]/40 py-3 text-[13px] font-semibold text-[#ff8fa1]"
-          >
-            Tắt Passkey
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                await enablePasskey()
-              } catch (error: any) {
-                toast({ tone: 'error', title: 'Không bật được Passkey', body: error?.message })
+              if (tgId) {
+                await copyToClipboard(tgId)
+                setTgCopied(true)
+                setTimeout(() => setTgCopied(false), 1600)
               }
             }}
-            className="w-full rounded-2xl accent-gradient py-3 text-[13px] font-semibold text-white shadow-glow"
+            className="flex shrink-0 items-center gap-1 rounded-xl border border-[color:var(--border)] px-2.5 py-1.5 text-[10.5px] font-semibold"
           >
-            Thiết lập Passkey
+            {tgCopied ? <Check size={12} /> : <Copy size={12} />}
+            {tgId ? `ID: ${tgId}` : 'Object None'}
           </button>
-        )}
+        </div>
 
-        <Row label="Mã PIN dự phòng">
+        <Row label="Mã PIN">
           <span className="text-[12px] font-semibold">{pinEnabled ? 'Đang bật' : 'Chưa đặt'}</span>
         </Row>
         <div className="flex gap-2">
@@ -284,12 +274,12 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
             inputMode="numeric"
             value={pinDraft}
             onChange={(event) => setPinDraft(event.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="PIN 6 số"
+            placeholder="PIN 4–6 số"
             className="flex-1 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 text-center text-[15px] tracking-[0.35em] outline-none focus:border-[color:var(--accent)]"
           />
           <button
             type="button"
-            disabled={pinDraft.length !== 6}
+            disabled={pinDraft.length < 4}
             onClick={async () => {
               try {
                 await setPin(pinDraft)
@@ -314,7 +304,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
         </div>
       </Section>
 
-      <Section icon={<Lock size={15} />} title="Tự động khoá" hint="Két tự khoá sau khoảng thời gian không thao tác và mở lại bằng FaceID hoặc PIN.">
+      <Section icon={<Lock size={15} />} title="Tự động khoá" hint="Két tự khoá sau khoảng thời gian không thao tác và mở lại bằng mã PIN.">
         <div className="flex gap-2">
           {LOCK_OPTIONS.map((minutes) => (
             <button
@@ -482,8 +472,8 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
         <Row label="Ví đang dùng">
           <span className="text-[12.5px] font-semibold">{activeWallet?.name}</span>
         </Row>
-        <Row label="Passkey đã đăng ký">
-          <span className="text-[12.5px] font-semibold">{passkeyRecord ? <Check size={14} /> : '—'}</span>
+        <Row label="Telegram ID">
+          <span className="text-[12.5px] font-semibold">{tgId || '—'}</span>
         </Row>
         <button
           type="button"
@@ -501,7 +491,6 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
               type="button"
               onClick={() => {
                 removeLocal('vault.v1')
-                removeLocal('passkey.v1')
                 removeLocal('pin.v1')
                 removeLocal('pinEnabled.v1')
                 removeLocal('localdata.v1')

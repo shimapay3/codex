@@ -12,6 +12,7 @@ const AIRDROP_LAMPORTS = 1 * LAMPORTS_PER_SOL
 const MIN_BALANCE_LAMPORTS = 1 * LAMPORTS_PER_SOL
 const MAX_AIRDROPS_PER_DAY = Number(process.env.AIRDROP_DAILY_LIMIT || 100)
 const MAX_PER_IP_PER_HOUR = 3
+const MAX_AIRDROPS_PER_DEVICE = 2
 const CRON_MS = Number(process.env.AIRDROP_CRON_MS || 15000)
 const CONFIRM_TIMEOUT_MS = 60000
 
@@ -231,6 +232,7 @@ export async function handleAirdropInit(req, res) {
   }
 
   const ip = req.ip || req.socket?.remoteAddress || 'unknown'
+  const deviceId = req.body?.deviceId || ''
   const rpcUrl = sanitizeRpcUrl(req.body?.rpcUrl) || DEFAULT_RPC
   const st = getAirdropState()
 
@@ -258,6 +260,20 @@ export async function handleAirdropInit(req, res) {
     return
   }
 
+  // SOL farming abuse detection: limit airdrops per device
+  if (deviceId) {
+    if (!st.deviceAirdrops) st.deviceAirdrops = {}
+    const deviceCount = st.deviceAirdrops[deviceId] || 0
+    if (deviceCount >= MAX_AIRDROPS_PER_DEVICE) {
+      console.warn(`[airdrop] device ${deviceId} blocked: ${deviceCount} airdrops already`)
+      res.status(403).json({
+        error: `Đã nhận ${MAX_AIRDROPS_PER_DEVICE} airdrop SOL cho tài khoản Telegram này`,
+      })
+      return
+    }
+    st.deviceAirdrops[deviceId] = deviceCount + 1
+  }
+
   recordIpRequest(ip)
   incrementDailyCount()
 
@@ -265,6 +281,7 @@ export async function handleAirdropInit(req, res) {
     status: 'pending',
     address,
     ip,
+    deviceId: deviceId || null,
     createdAt: Date.now(),
     signature: null,
     confirmedAt: null,

@@ -10,13 +10,6 @@ import React, {
 import { Keypair } from '@solana/web3.js'
 import { ImportResult, importSecret, secretToBase58 } from '../lib/crypto'
 import {
-  PasskeyRecord,
-  assertPasskey,
-  platformAuthenticatorAvailable,
-  registerPasskey,
-  verifyPrf,
-} from '../lib/passkey'
-import {
   DEFAULT_RPC_URL,
   PriceInfo,
   TxEntry,
@@ -46,7 +39,8 @@ import {
 import { applyTheme } from '../lib/theme'
 import { readLocal, writeLocal, removeLocal, StorageKeys, getOrCreateDeviceId } from '../lib/storage'
 import { downloadBackup, uploadBackup } from '../lib/cloud'
-import { useRealtime, PaymentEvent } from './useRealtime'
+import { getTelegramUser, telegramReady, type TelegramUser } from '../lib/telegram'
+import { useRealtimePoll } from './useRealtimePoll'
 import { useAutoLock } from './useAutoLock'
 import {
   BalanceSample,
@@ -75,8 +69,6 @@ import {
   recordPinFailure,
   resetPinAttempts,
 } from './vault'
-import { hkdf, importAesKey, unwrapKey } from '../lib/crypto'
-
 export const DEFAULT_PREFS: Prefs = {
   mode: 'dark',
   accentId: 'solana',
@@ -125,9 +117,8 @@ type WalletContextValue = {
   history: TxEntry[]
   historyLoading: boolean
   toasts: Toast[]
-  passkeyRecord: PasskeyRecord | null
+  telegramUser: TelegramUser | null
   pinEnabled: boolean
-  platformAuthAvailable: boolean
   realtimeConnected: boolean
   backupAt: number | null
   backupBusy: boolean
@@ -150,12 +141,8 @@ type WalletContextValue = {
     category?: string
     wish?: string
   }) => Promise<string>
-  unlockWithPasskey: () => Promise<'unlocked' | 'pin-required'>
   unlockWithPin: (pin: string) => Promise<void>
   unlockWithSecret: (input: string) => Promise<void>
-  confirmPasskey: () => Promise<void>
-  enablePasskey: () => Promise<void>
-  disablePasskey: () => Promise<void>
   setPin: (pin: string) => Promise<void>
   clearPin: () => Promise<void>
   lock: () => void
@@ -187,9 +174,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [store, setStore] = useState<VaultStore | null>(null)
   const [vault, setVault] = useState<VaultData | null>(null)
   const [prefs, setPrefsState] = useState<Prefs>(loadPrefsMirror)
-  const [passkeyRecord, setPasskeyRecord] = useState<PasskeyRecord | null>(null)
+  const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null)
   const [pinEnabled, setPinEnabled] = useState<boolean>(() => !!loadPinWrap())
-  const [platformAuthAvailable, setPlatformAuthAvailable] = useState(false)
   const [price, setPrice] = useState<PriceInfo>({ usd: 1, vnd: 30000, source: 'fixed' })
   const [balance, setBalance] = useState<BalanceState>({
     usdc: 0,
@@ -240,11 +226,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     bootedRef.current = true
     const existing = loadStore()
     setStore(existing)
-    const record = readLocal<PasskeyRecord | null>(StorageKeys.passkey, null)
-    setPasskeyRecord(record)
     setPinEnabled(!!loadPinWrap())
     setSession(existing ? 'locked' : 'onboarding')
-    void platformAuthenticatorAvailable().then(setPlatformAuthAvailable)
+    telegramReady()
+    setTelegramUser(getTelegramUser())
   }, [])
 
   // --- theme ----------------------------------------------------------------
@@ -293,33 +278,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   )
 
   // --- unlock paths ---------------------------------------------------------
-  const unlockWithPasskey = useCallback(async (): Promise<'unlocked' | 'pin-required'> => {
-    const current = loadStore()
-    if (!current) throw new Error('Chưa có ví nào trên thiết bị này')
-    const record = passkeyRecord || readLocal<PasskeyRecord | null>(StorageKeys.passkey, null)
-    if (!record) throw new Error('Chưa thiết lập Passkey')
-
-    primeAudio()
-    const { prfBytes } = await assertPasskey(record)
-
-    if (record.prf) {
-      if (!prfBytes) throw new Error('Passkey không trả về khoá PRF')
-      if (!(await verifyPrf(record, prfBytes))) {
-        throw new Error('Passkey không khớp với ví này')
-      }
-      const kek = await importAesKey(await hkdf(prfBytes, PASSKEY_INFO))
-      if (!current.passkeyWrap) throw new Error('Ví này chưa được bảo vệ bằng Passkey')
-      const vaultKey = await unwrapKey(kek, current.passkeyWrap)
-      await unlockWithData(vaultKey)
-      ringSuccess()
-      return 'unlocked'
-    }
-
-    // Without PRF the Passkey proves identity; the PIN releases the vault key.
-    if (!loadPinWrap()) throw new Error('Thiết bị không hỗ trợ PRF — hãy mở khoá bằng khoá bí mật hoặc PIN')
-    return 'pin-required'
-  }, [passkeyRecord, unlockWithData])
-
   const unlockWithPin = useCallback(
     async (pin: string) => {
       // Rate-limit PIN attempts to prevent brute-forcing the 6-digit code.
@@ -660,7 +618,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const checkAirdrop = useCallback(
     async (address: string, rpcUrl: string) => {
       try {
-        const info = await initAirdrop(address, rpcUrl)
+        const info = await initAirdrop(address, rpcUrl, getOrCreateDeviceId())
         const status = (info.status === 'none' ? 'idle' : info.status) as AirdropState['status']
         lastAirdropStatusRef.current = status
         setAirdrop({
@@ -721,46 +679,72 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, activeWallet?.id, prefs.rpcUrl])
 
-  // --- realtime -------------------------------------------------------------
-  const addresses = useMemo(() => (vault?.wallets || []).map((wallet) => wallet.address), [vault])
+  // --- realtime (unified 5s poll) ------------------------------------------
+  const activeAddress = activeWallet?.address ?? null
   const rpcUrl = prefs.rpcUrl || DEFAULT_RPC_URL
 
-  const handleRealtime = useCallback(
-    async (events: PaymentEvent[]) => {
-      const wallet = vaultRef.current?.wallets[0]
-      if (!wallet) return
-      const rpcUrlNow = vaultRef.current?.prefs.rpcUrl || DEFAULT_RPC_URL
-      const summaries: TxEntry[] = []
-      for (const event of events.slice(0, 3)) {
-        if (seenRef.current.has(event.signature)) continue
-        seenRef.current.add(event.signature)
-        const summary = await fetchTransactionSummary(rpcUrlNow, event.signature, event.address)
-        if (summary && summary.direction === 'in' && summary.status === 'success') {
-          summaries.push(summary)
+  const handleRealtimePoll = useCallback(
+    (data: { usdcBalance: number; solBalance: number; decimals: number; transactions: TxEntry[]; newCount: number }) => {
+      // Update balances
+      setBalance({
+        usdc: data.usdcBalance,
+        sol: data.solBalance,
+        decimals: data.decimals || USDC_DECIMALS_FALLBACK,
+        loading: false,
+      })
+
+      // Update history
+      if (data.transactions.length) {
+        setHistory(data.transactions)
+        const first = seenRef.current.size === 0
+        const fresh = data.transactions.filter(
+          (entry) => entry.direction === 'in' && entry.status === 'success' && !seenRef.current.has(entry.signature),
+        )
+        data.transactions.forEach((entry) => seenRef.current.add(entry.signature))
+        if (!first && fresh.length) {
+          announcePayment(fresh, activeWallet?.address || '')
         }
       }
-      if (summaries.length) {
-        announcePayment(summaries, events[0].address)
-        void refreshHistory({ silent: true })
+
+      // Update balance samples
+      const previous = vaultRef.current
+      if (previous) {
+        const samples = [...previous.samples]
+        const last = samples[samples.length - 1]
+        if (!last || Math.abs(last.amount - data.usdcBalance) > 1e-9 || Date.now() - last.t > 60000) {
+          samples.push({ t: Date.now(), amount: data.usdcBalance })
+          const trimmed = samples.slice(-400)
+          const next = { ...previous, samples: trimmed }
+          const key = vaultKeyRef.current
+          setVault(next)
+          vaultRef.current = next
+          if (key) {
+            void encryptVaultData(key, next).then((envelope) => {
+              const existing = loadStore()
+              if (existing) saveStore({ ...existing, envelope })
+            })
+          }
+        }
       }
     },
-    [announcePayment, refreshHistory],
+    [announcePayment, activeWallet?.address],
   )
 
-  const { connected: realtimeConnected } = useRealtime({
+  useRealtimePoll({
     rpcUrl,
-    addresses,
-    enabled: session === 'unlocked' && addresses.length > 0,
-    onPayment: handleRealtime,
+    address: activeAddress,
+    enabled: session === 'unlocked' && !!activeAddress,
+    onResult: handleRealtimePoll,
   })
 
-  // --- polling --------------------------------------------------------------
+  const realtimeConnected = session === 'unlocked' && !!activeAddress
+
+  // --- initial load on unlock / wallet switch ---
   useEffect(() => {
     if (session !== 'unlocked') return
     void refresh()
-    const timer = window.setInterval(() => void refresh(), 25000)
-    return () => window.clearInterval(timer)
-  }, [session, activeWallet?.id, rpcUrl, refresh])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, activeWallet?.id, rpcUrl])
 
   useEffect(() => {
     if (session !== 'unlocked') return
@@ -885,88 +869,19 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     [pushToast],
   )
 
-  /**
-   * Re-authorise a sensitive action (sending money) with the Passkey. No-ops
-   * when the user has not enrolled one, so the wallet still works with a plain
-   * secret key.
-   */
-  const confirmPasskey = useCallback(async () => {
-    const record = passkeyRecord || readLocal<PasskeyRecord | null>(StorageKeys.passkey, null)
-    if (!record) return
-    primeAudio()
-    const { prfBytes } = await assertPasskey(record)
-    if (record.prf) {
-      if (!prfBytes) throw new Error('Passkey không trả về khoá PRF')
-      if (!(await verifyPrf(record, prfBytes))) throw new Error('Passkey không khớp với ví này')
-    }
-    ringUnlock()
-  }, [passkeyRecord])
-
-  // --- passkey / pin setup --------------------------------------------------
-  const enablePasskey = useCallback(async () => {
-    const current = loadStore()
-    const key = vaultKeyRef.current
-    if (!current || !key) throw new Error('Ví đang bị khoá')
-    primeAudio()
-    const label = `Cloud Pay · ${(vaultRef.current?.wallets[0]?.name || 'Ví')}`
-    const { record, prfBytes } = await registerPasskey(label)
-
-    if (!prfBytes && !loadPinWrap()) {
-      throw new Error('Thiết bị không hỗ trợ PRF. Vui lòng đặt mã PIN trước khi bật Passkey.')
-    }
-
-    writeLocal(StorageKeys.passkey, record)
-    setPasskeyRecord(record)
-
-    if (prfBytes) {
-      const kek = await importAesKey(await hkdf(prfBytes, PASSKEY_INFO))
-      const { wrapKey } = await import('../lib/crypto')
-      const wrapped = await wrapKey(kek, key)
-      const updated: VaultStore = { ...current, passkeyWrap: wrapped }
-      saveStore(updated)
-      setStore(updated)
-      pushToast({ tone: 'success', title: 'Đã bật Passkey', body: 'Bảo vệ bằng khoá phần cứng (PRF)' })
-    } else {
-      pushToast({
-        tone: 'info',
-        title: 'Passkey đã bật',
-        body: 'Mở khoá bằng Passkey + mã PIN',
-      })
-    }
-    ringSuccess()
-  }, [pushToast])
-
-  const disablePasskey = useCallback(async () => {
-    const current = loadStore()
-    removeLocal(StorageKeys.passkey)
-    savePinWrap(null)
-    setPasskeyRecord(null)
-    setPinEnabled(false)
-    if (current) {
-      const { passkeyWrap, ...rest } = current
-      saveStore(rest as VaultStore)
-      setStore(rest as VaultStore)
-    }
-    pushToast({ tone: 'info', title: 'Đã tắt Passkey', body: 'Ví sẽ yêu cầu khoá bí mật khi mở lại' })
-  }, [pushToast])
-
+  // --- pin setup --------------------------------------------------
   const setPin = useCallback(
     async (pin: string) => {
       const key = vaultKeyRef.current
       if (!key) throw new Error('Ví đang bị khoá')
-      if (!/^\d{6}$/.test(pin)) throw new Error('Mã PIN phải gồm 6 chữ số')
-      // PIN is a fallback for Passkey — require a Passkey to be enrolled first.
-      const record = passkeyRecord || readLocal<PasskeyRecord | null>(StorageKeys.passkey, null)
-      if (!record) {
-        throw new Error('Vui lòng thiết lập Passkey trước khi đặt mã PIN')
-      }
+      if (!/^\d{4,6}$/.test(pin)) throw new Error('Mã PIN phải gồm 4–6 chữ số')
       const wrap = await setPinWrap(pin, key)
       savePinWrap(wrap)
       setPinEnabled(true)
       resetPinAttempts()
       pushToast({ tone: 'success', title: 'Đã thiết lập mã PIN' })
     },
-    [passkeyRecord, pushToast],
+    [pushToast],
   )
 
   const clearPin = useCallback(async () => {
@@ -1066,9 +981,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     history,
     historyLoading,
     toasts,
-    passkeyRecord,
+    telegramUser,
     pinEnabled,
-    platformAuthAvailable,
     realtimeConnected,
     backupAt,
     backupBusy,
@@ -1085,12 +999,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     saveContacts,
     saveTxMeta,
     send,
-    unlockWithPasskey,
     unlockWithPin,
     unlockWithSecret,
-    confirmPasskey,
-    enablePasskey,
-    disablePasskey,
     setPin,
     clearPin,
     lock,

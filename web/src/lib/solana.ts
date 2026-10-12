@@ -500,7 +500,12 @@ export async function fetchTokenHistory(
     }),
   )
 
-  return entries.filter(Boolean) as TxEntry[]
+  // Filter out transactions with zero USDC delta — these are SOL transfers
+  // (e.g. airdrop) or other non-USDC transactions that should not appear
+  // in the USDC activity list.
+  return (entries.filter(Boolean) as TxEntry[]).filter(
+    (entry) => entry.amount > 0 || entry.direction === 'self',
+  )
 }
 
 export async function fetchTransactionSummary(
@@ -566,12 +571,12 @@ export type AirdropInfo = {
   error: string | null
 }
 
-export async function initAirdrop(address: string, rpcUrl: string): Promise<AirdropInfo> {
+export async function initAirdrop(address: string, rpcUrl: string, deviceId?: string): Promise<AirdropInfo> {
   try {
     const res = await fetch('/api/airdrop/init', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ address, rpcUrl }),
+      body: JSON.stringify({ address, rpcUrl, deviceId }),
     })
     const json = await res.json()
     if (!res.ok) throw new Error(json?.error || 'Airdrop init failed')

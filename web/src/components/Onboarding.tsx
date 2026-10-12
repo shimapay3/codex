@@ -2,27 +2,43 @@ import { useState } from 'react'
 import {
   ArrowRight,
   CloudDownload,
-  Fingerprint,
   KeyRound,
   Loader2,
   ShieldCheck,
   Sparkles,
   Wallet,
+  Copy,
+  Check,
 } from 'lucide-react'
 import Logo from './Logo'
 import { useWallet } from '../state/WalletProvider'
 import { USDC_AVATAR, USDC_MINT, MAX_WALLETS } from '../lib/solana'
+import {
+  getTelegramDisplayName,
+  getTelegramUsername,
+  getTelegramUserIdString,
+  getTelegramPhotoUrl,
+  TELEGRAM_LOGO,
+} from '../lib/telegram'
+import { copyToClipboard } from '../lib/format'
 
 type Step = 'welcome' | 'method' | 'import' | 'restore' | 'secure'
 
 export default function Onboarding() {
-  const { createWallet, restoreFromCloud, enablePasskey, setPin, wallets, pushToast, completeOnboarding } = useWallet()
+  const { createWallet, restoreFromCloud, setPin, wallets, pushToast, completeOnboarding, telegramUser } =
+    useWallet()
   const [step, setStep] = useState<Step>('welcome')
   const [secret, setSecret] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pin, setPinValue] = useState('')
   const [pin2, setPin2] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const tgName = getTelegramDisplayName()
+  const tgUsername = getTelegramUsername()
+  const tgId = getTelegramUserIdString()
+  const tgPhoto = getTelegramPhotoUrl()
 
   const run = async (task: () => Promise<unknown>) => {
     setBusy(true)
@@ -48,7 +64,39 @@ export default function Onboarding() {
         </p>
       </div>
 
-      <div className="mt-7 flex-1">
+      {/* Telegram user identity card */}
+      <div className="mt-5 flex items-center gap-3 rounded-[22px] glass-strong p-4">
+        <img
+          src={tgPhoto || TELEGRAM_LOGO}
+          alt="Telegram"
+          className="h-12 w-12 rounded-full ring-2 ring-[#229ED9]/40"
+          onError={(e) => {
+            ;(e.target as HTMLImageElement).src = TELEGRAM_LOGO
+          }}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] font-semibold">{tgName}</p>
+          <p className="truncate text-[11px] text-[color:var(--muted)]">
+            {tgUsername || 'Object None'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={async () => {
+            if (tgId) {
+              await copyToClipboard(tgId)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 1600)
+            }
+          }}
+          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[color:var(--border)] px-2.5 py-1.5 text-[10.5px] font-semibold"
+        >
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+          {tgId ? `ID: ${tgId}` : 'Object None'}
+        </button>
+      </div>
+
+      <div className="mt-4 flex-1">
         {step === 'welcome' && (
           <div className="space-y-3">
             <div className="rounded-[26px] glass-strong p-5">
@@ -69,7 +117,7 @@ export default function Onboarding() {
             <ul className="space-y-2.5 rounded-[26px] glass p-5">
               {[
                 { icon: <Wallet size={16} />, text: 'Nhiều ví, chuyển đổi tức thì' },
-                { icon: <Fingerprint size={16} />, text: 'Mở khoá & ký giao dịch bằng Passkey' },
+                { icon: <ShieldCheck size={16} />, text: 'Bảo mật bằng Telegram + mã PIN' },
                 { icon: <Sparkles size={16} />, text: 'MEMO đẹp, danh mục màu, lời chúc' },
                 { icon: <CloudDownload size={16} />, text: 'Tự động sao lưu đám mây mã hoá' },
               ].map((item) => (
@@ -217,42 +265,18 @@ export default function Onboarding() {
           <div className="space-y-3">
             <div className="rounded-[26px] glass-strong p-5">
               <p className="flex items-center gap-2 text-[14px] font-semibold">
-                <Fingerprint size={17} className="accent-text" /> Bảo vệ bằng Passkey
+                <KeyRound size={17} className="accent-text" /> Mã PIN bảo vệ
               </p>
               <p className="mt-1.5 text-[11.5px] leading-relaxed text-[color:var(--muted)]">
-                Dùng FaceID / Touch ID / Windows Hello hoặc khoá màn hình Android để mở ví và ký giao
-                dịch. Bạn có thể bật sau trong Cài đặt.
-              </p>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() =>
-                  run(async () => {
-                    await enablePasskey()
-                    pushToast({ tone: 'success', title: 'Đã bật Passkey' })
-                  })
-                }
-                className="mt-3.5 flex w-full items-center justify-center gap-2 rounded-2xl accent-gradient py-3.5 text-[14px] font-semibold text-white shadow-glow disabled:opacity-60"
-              >
-                {busy ? <Loader2 size={16} className="animate-spin" /> : <Fingerprint size={16} />}
-                Thiết lập Passkey
-              </button>
-            </div>
-
-            <div className="rounded-[26px] glass p-5">
-              <p className="flex items-center gap-2 text-[14px] font-semibold">
-                <KeyRound size={17} className="accent-text" /> Mã PIN dự phòng
-              </p>
-              <p className="mt-1.5 text-[11.5px] leading-relaxed text-[color:var(--muted)]">
-                6 chữ số mở khoá nhanh khi Passkey không khả dụng. Chỉ dùng được sau khi Passkey đã được uỷ
-                quyền.
+                Tạo mã PIN 4–6 chữ số để khoá và mở ví. Đây là lớp bảo mật chính
+                cùng với định danh Telegram của bạn.
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <input
                   inputMode="numeric"
                   value={pin}
                   onChange={(event) => setPinValue(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="PIN 6 số"
+                  placeholder="PIN 4–6 số"
                   className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 text-center text-[16px] tracking-[0.4em] outline-none focus:border-[color:var(--accent)]"
                 />
                 <input
@@ -265,16 +289,18 @@ export default function Onboarding() {
               </div>
               <button
                 type="button"
-                disabled={busy || pin.length !== 6 || pin !== pin2}
+                disabled={busy || pin.length < 4 || pin !== pin2}
                 onClick={() =>
                   run(async () => {
                     await setPin(pin)
                     pushToast({ tone: 'success', title: 'Đã thiết lập mã PIN' })
+                    completeOnboarding()
                   })
                 }
-                className="mt-2.5 w-full rounded-2xl border border-[color:var(--border)] py-3 text-[13px] font-semibold disabled:opacity-45"
+                className="mt-3.5 flex w-full items-center justify-center gap-2 rounded-2xl accent-gradient py-3.5 text-[14px] font-semibold text-white shadow-glow disabled:opacity-60"
               >
-                Lưu mã PIN
+                {busy ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                Lưu PIN & vào ví
               </button>
             </div>
 
