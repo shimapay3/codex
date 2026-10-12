@@ -7,12 +7,13 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  Loader2,
   RefreshCw,
   Wifi,
   WifiOff,
 } from 'lucide-react'
 import { useWallet } from '../state/WalletProvider'
-import { TxEntry, formatAmount } from '../lib/solana'
+import { TxEntry, formatAmount, formatSolBalance, SOL_ICON } from '../lib/solana'
 import { formatUsd, formatVnd } from '../lib/format'
 import { shortAddress } from '../lib/crypto'
 import UsdcAvatar from '../components/UsdcAvatar'
@@ -31,6 +32,7 @@ export default function HomePage() {
     refresh,
     activeWallet,
     realtimeConnected,
+    airdrop,
   } = useWallet()
   const [selected, setSelected] = useState<TxEntry | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -104,8 +106,19 @@ export default function HomePage() {
               </>
             )}
           </span>
-          <span className="rounded-full bg-[color:var(--surface)] px-2.5 py-1 font-semibold text-[color:var(--muted)]">
-            {balance.sol < 0.001 ? 'Thiếu SOL trả phí' : `${balance.sol.toFixed(4)} SOL`}
+          <span className="flex items-center gap-1.5 rounded-full bg-[color:var(--surface)] px-2.5 py-1 font-semibold">
+            <img src={SOL_ICON} alt="SOL" className="h-3.5 w-3.5 rounded-full" loading="lazy" />
+            {airdrop.status === 'pending' || airdrop.status === 'sending' ? (
+              <span className="flex items-center gap-1 text-[#ffb020]">
+                <Loader2 size={11} className="animate-spin" /> Đang chờ airdrop…
+              </span>
+            ) : hidden ? (
+              '••••'
+            ) : balance.sol < 0.001 ? (
+              <span className="text-[#ffb020]">Thiếu SOL phí gas</span>
+            ) : (
+              <span className="tabular-nums">{balance.sol.toFixed(4)} SOL</span>
+            )}
           </span>
         </div>
 
@@ -140,23 +153,51 @@ export default function HomePage() {
       <div className="rounded-[26px] glass p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[14px] font-semibold">Tài sản</h2>
-          <span className="text-[10.5px] text-[color:var(--muted)]">1 token được hỗ trợ</span>
+          <span className="text-[10.5px] text-[color:var(--muted)]">2 tài sản</span>
         </div>
-        <div className="flex items-center gap-3 rounded-2xl bg-[color:var(--surface)] p-3">
-          <UsdcAvatar size={40} />
-          <div className="min-w-0 flex-1">
-            <p className="text-[13.5px] font-semibold">USD Coin</p>
-            <p className="font-mono text-[10px] break-all text-[color:var(--muted)]">
-              {shortAddress(USDC_MINT, 8)}
-            </p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 rounded-2xl bg-[color:var(--surface)] p-3">
+            <UsdcAvatar size={40} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13.5px] font-semibold">USD Coin</p>
+              <p className="font-mono text-[10px] break-all text-[color:var(--muted)]">
+                {shortAddress(USDC_MINT, 8)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[14px] font-semibold tabular-nums">
+                {hidden ? '••••' : formatAmount(balance.usdc, 2)}
+              </p>
+              <p className="text-[10.5px] text-[color:var(--muted)]">
+                {hidden ? '≈ ••••' : formatVnd(balance.usdc * price.vnd)}
+              </p>
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-[14px] font-semibold tabular-nums">
-              {hidden ? '••••' : formatAmount(balance.usdc, 2)}
-            </p>
-            <p className="text-[10.5px] text-[color:var(--muted)]">
-              {hidden ? '≈ ••••' : formatVnd(balance.usdc * price.vnd)}
-            </p>
+          <div className="flex items-center gap-3 rounded-2xl bg-[color:var(--surface)] p-3">
+            <img
+              src={SOL_ICON}
+              alt="Solana"
+              className="h-10 w-10 rounded-full ring-2 ring-white/15"
+              loading="lazy"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13.5px] font-semibold">Solana</p>
+              <p className="text-[10.5px] text-[color:var(--muted)]">
+                {airdrop.status === 'pending' || airdrop.status === 'sending' ? (
+                  <span className="flex items-center gap-1 text-[#ffb020]">
+                    <Loader2 size={10} className="animate-spin" /> Đang chờ airdrop SOL
+                  </span>
+                ) : (
+                  'Phí gas · không có giá trị USD'
+                )}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[14px] font-semibold tabular-nums">
+                {hidden ? '••••' : formatSolBalance(balance.sol)}
+              </p>
+              <p className="text-[10.5px] text-[color:var(--muted)]">—</p>
+            </div>
           </div>
         </div>
       </div>

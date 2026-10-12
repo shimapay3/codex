@@ -31,6 +31,7 @@ export default function SendForm() {
     passkeyRecord,
     confirmPasskey,
     prefs,
+    airdrop,
   } = useWallet()
 
   const [to, setTo] = useState('')
@@ -342,14 +343,22 @@ export default function SendForm() {
       )}
       {noFeeBudget && (
         <p className="flex items-center gap-1.5 rounded-2xl border border-[#ffb020]/40 bg-[#ffb020]/10 px-3.5 py-2.5 text-[12px] text-[#ffc95c]">
-          <AlertTriangle size={14} /> Cần một ít SOL trong ví để trả phí mạng
+          {airdrop.status === 'pending' || airdrop.status === 'sending' ? (
+            <>
+              <Loader2 size={14} className="animate-spin" /> Đang chờ airdrop SOL từ payserver…
+            </>
+          ) : (
+            <>
+              <AlertTriangle size={14} /> Cần một ít SOL trong ví để trả phí mạng
+            </>
+          )}
         </p>
       )}
 
       {stage === 'form' && (
         <button
           type="button"
-          disabled={!validTo || amount <= 0 || insufficient}
+          disabled={!validTo || amount <= 0 || insufficient || noFeeBudget}
           onClick={() => setStage('review')}
           className="flex w-full items-center justify-center gap-2 rounded-2xl accent-gradient py-4 text-[15px] font-semibold text-white shadow-glow disabled:opacity-45"
         >

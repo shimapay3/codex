@@ -44,6 +44,17 @@ Verify with `docker compose -f docker-compose.base44.yml ps` and `curl -s localh
 - **Only USDC is supported** (`USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2`). Transfers add a
   `spl-memo` instruction so the note is visible on-chain, and open the recipient's associated token
   account when it does not exist yet (the sender pays the small rent).
+- **SOL is gas-only** — it has no USD value and is shown with the Solana explorer icon
+  (`https://explorer.solana.com/icon-144.png`) in the format `◎500,999,998.994414 SOL`. The
+  balance hero and the assets list both display it; the Send button stays disabled while the wallet
+  has no fee budget.
+- **Payserver airdrops 1 SOL** to new wallets that have no gas. The server loads a keypair from
+  `SOLANA_KEYPAIR_PATH` (default `/root/.config/solana/id.json`, falling back to a generated
+  keypair in the data dir). `POST /api/airdrop/init` registers an address; a cron
+  (`AIRDROP_CRON_MS`, default 15 s) checks the payserver's balance and sends 1 SOL per wallet.
+  Security: one airdrop per address, max 3 requests per IP per hour, a daily cap
+  (`AIRDROP_DAILY_LIMIT`, default 100), and the cron re-checks the recipient's balance before
+  sending. The client polls `GET /api/airdrop/status/:address` and shows a toast when SOL arrives.
 - **USDC price** is fixed at 1 USD / 30,000 VND unless a price endpoint is configured in Settings
   (blank by default). A failing endpoint falls back to the fixed rate and flags `fallback: true`.
 - Icons are pre-rendered PNGs in `web/public/icons/` (iOS ignores SVG for `apple-touch-icon`). The

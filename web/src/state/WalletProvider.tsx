@@ -20,11 +20,14 @@ import {
   DEFAULT_RPC_URL,
   PriceInfo,
   TxEntry,
+  AirdropInfo,
   fetchPrice,
   fetchTokenHistory,
   fetchTransactionSummary,
   getSolBalance,
   getUsdcBalance,
+  initAirdrop,
+  fetchAirdropStatus,
   sendUsdc,
   USDC_DECIMALS_FALLBACK,
 } from '../lib/solana'
@@ -94,6 +97,13 @@ export type Toast = {
 
 export type BalanceState = { usdc: number; sol: number; decimals: number; loading: boolean }
 
+export type AirdropState = {
+  status: 'idle' | 'pending' | 'sending' | 'confirmed' | 'error'
+  payserver: string | null
+  signature: string | null
+  error: string | null
+}
+
 const PASSKEY_INFO = 'cloudpay.passkey.v1'
 
 type WalletContextValue = {
@@ -117,6 +127,7 @@ type WalletContextValue = {
   backupBusy: boolean
   autoLockSeconds: number | null
   lastPayment: PaymentEvent | null
+  airdrop: AirdropState
   refresh: () => Promise<void>
   setPrefs: (patch: Partial<Prefs>) => void
   createWallet: (input?: string, name?: string) => Promise<WalletRecord>
@@ -186,11 +197,18 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [backupAt, setBackupAt] = useState<number | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
   const [lastPayment, setLastPayment] = useState<PaymentEvent | null>(null)
+  const [airdrop, setAirdrop] = useState<AirdropState>({
+    status: 'idle',
+    payserver: null,
+    signature: null,
+    error: null,
+  })
 
   const vaultKeyRef = useRef<Uint8Array | null>(null)
   const seenRef = useRef<Set<string>>(new Set())
   const bootedRef = useRef(false)
   const backupTimer = useRef<number | undefined>(undefined)
+  const lastAirdropStatusRef = useRef<AirdropState['status']>('idle')
 
   const vaultRef = useRef<VaultData | null>(null)
   vaultRef.current = vault
@@ -599,6 +617,71 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     await Promise.all([refreshBalance(), refreshHistory({ silent: true })])
   }, [refreshBalance, refreshHistory])
 
+  // --- SOL airdrop ----------------------------------------------------------
+  const checkAirdrop = useCallback(
+    async (address: string, rpcUrl: string) => {
+      try {
+        const info = await initAirdrop(address, rpcUrl)
+        const status = (info.status === 'none' ? 'idle' : info.status) as AirdropState['status']
+        lastAirdropStatusRef.current = status
+        setAirdrop({
+          status,
+          payserver: info.payserver || null,
+          signature: info.signature,
+          error: info.error,
+        })
+        if (status === 'pending' || status === 'sending') {
+          pushToast({ tone: 'info', title: 'Đang chờ airdrop SOL', body: 'Payserver sẽ chuyển 1 SOL phí gas' })
+        }
+      } catch {
+        lastAirdropStatusRef.current = 'idle'
+        setAirdrop({ status: 'idle', payserver: null, signature: null, error: null })
+      }
+    },
+    [pushToast],
+  )
+
+  // Poll airdrop status while pending or sending.
+  useEffect(() => {
+    if (airdrop.status !== 'pending' && airdrop.status !== 'sending') return
+    const wallet =
+      vaultRef.current?.wallets.find((w) => w.id === vaultRef.current?.activeWalletId) ||
+      vaultRef.current?.wallets[0]
+    if (!wallet) return
+    const timer = window.setInterval(async () => {
+      const info = await fetchAirdropStatus(wallet.address)
+      const status = (info.status === 'none' ? 'idle' : info.status) as AirdropState['status']
+      if (status === lastAirdropStatusRef.current) return
+      lastAirdropStatusRef.current = status
+      setAirdrop({
+        status,
+        payserver: info.payserver || null,
+        signature: info.signature,
+        error: info.error,
+      })
+      if (status === 'confirmed') {
+        if (prefs.sound) ringIncoming()
+        vibrate([90, 60, 90])
+        if (prefs.notifications) showSystemNotification('Đã nhận 1 SOL', 'Payserver đã chuyển SOL phí gas')
+        pushToast({ tone: 'success', title: 'Đã nhận 1 SOL', body: 'Ví đã được nạp phí gas' })
+        void refresh()
+      } else if (status === 'error') {
+        pushToast({ tone: 'error', title: 'Airdrop thất bại', body: info.error || 'Không nhận được SOL' })
+      }
+    }, 5000)
+    return () => window.clearInterval(timer)
+  }, [airdrop.status, prefs.notifications, prefs.sound, pushToast, refresh])
+
+  // Check airdrop when session unlocks or active wallet changes.
+  useEffect(() => {
+    if (session !== 'unlocked') return
+    const wallet = activeWallet
+    if (!wallet) return
+    const rpcUrlNow = prefs.rpcUrl || DEFAULT_RPC_URL
+    void checkAirdrop(wallet.address, rpcUrlNow)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, activeWallet?.id, prefs.rpcUrl])
+
   // --- realtime -------------------------------------------------------------
   const addresses = useMemo(() => (vault?.wallets || []).map((wallet) => wallet.address), [vault])
   const rpcUrl = prefs.rpcUrl || DEFAULT_RPC_URL
@@ -655,6 +738,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     vaultRef.current = null
     setHistory([])
     setLastPayment(null)
+    setAirdrop({ status: 'idle', payserver: null, signature: null, error: null })
+    lastAirdropStatusRef.current = 'idle'
     setSession('locked')
   }, [])
 
@@ -936,6 +1021,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     backupBusy,
     autoLockSeconds: secondsLeft,
     lastPayment,
+    airdrop,
     refresh,
     setPrefs,
     createWallet,

@@ -32,6 +32,7 @@ export const DEFAULT_RPC_URL = 'https://rpc.localusd.cloud'
 export const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
 
 export const EXPLORER_BASE = 'https://explorer.solana.com'
+export const SOL_ICON = 'https://explorer.solana.com/icon-144.png'
 export const USDC_DECIMALS_FALLBACK = 6
 
 /** Every RPC call goes through our own API so CORS never blocks a custom node. */
@@ -508,6 +509,51 @@ export async function fetchTransactionSummary(
 }
 
 export type PriceInfo = { usd: number; vnd: number; source: string; fallback?: boolean }
+
+// --- SOL airdrop API -------------------------------------------------------
+// New wallets call the payserver to request 1 SOL for gas. The server
+// rate-limits, deduplicates and processes the queue via cron.
+
+export type AirdropStatus = 'none' | 'pending' | 'sending' | 'confirmed' | 'error'
+
+export type AirdropInfo = {
+  status: AirdropStatus
+  address: string
+  payserver: string
+  signature: string | null
+  confirmedAt: number | null
+  error: string | null
+}
+
+export async function initAirdrop(address: string, rpcUrl: string): Promise<AirdropInfo> {
+  try {
+    const res = await fetch('/api/airdrop/init', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ address, rpcUrl }),
+    })
+    const json = await res.json()
+    if (!res.ok) throw new Error(json?.error || 'Airdrop init failed')
+    return json as AirdropInfo
+  } catch {
+    return { status: 'none', address, payserver: '', signature: null, confirmedAt: null, error: null }
+  }
+}
+
+export async function fetchAirdropStatus(address: string): Promise<AirdropInfo> {
+  try {
+    const res = await fetch(`/api/airdrop/status/${address}`)
+    const json = await res.json()
+    if (!res.ok) throw new Error(json?.error || 'Airdrop status failed')
+    return json as AirdropInfo
+  } catch {
+    return { status: 'none', address, payserver: '', signature: null, confirmedAt: null, error: null }
+  }
+}
+
+export function formatSolBalance(sol: number): string {
+  return `◎${sol.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} SOL`
+}
 
 export async function fetchPrice(endpoint?: string): Promise<PriceInfo> {
   const query = endpoint?.trim() ? `?endpoint=${encodeURIComponent(endpoint.trim())}` : ''

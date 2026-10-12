@@ -2,6 +2,7 @@ import http from 'node:http'
 import express from 'express'
 import { DEFAULT_RPC, handleRpcProxy } from './rpc.mjs'
 import { startWatcher } from './watcher.mjs'
+import { startAirdropCron, handleAirdropInit, handleAirdropStatus, handleAirdropInfo } from './airdrop.mjs'
 import { getState, load, save } from './store.mjs'
 
 const PORT = Number(process.env.PORT || 8000)
@@ -27,6 +28,14 @@ app.get('/health', (_req, res) => {
 })
 
 app.post('/api/rpc', handleRpcProxy)
+
+// --- SOL airdrop for new wallets -------------------------------------------
+// The payserver holds a funded keypair and sends 1 SOL to new wallets that
+// have no gas budget. Rate-limited and deduplicated to prevent abuse.
+
+app.post('/api/airdrop/init', handleAirdropInit)
+app.get('/api/airdrop/status/:address', handleAirdropStatus)
+app.get('/api/airdrop/info', handleAirdropInfo)
 
 function coerceNumber(value) {
   const n = typeof value === 'string' ? Number.parseFloat(value) : value
@@ -161,6 +170,7 @@ load()
 
 const server = http.createServer(app)
 startWatcher(server)
+startAirdropCron()
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[api] Cloud Pay Wallet API on :${PORT} — default RPC ${DEFAULT_RPC}`)

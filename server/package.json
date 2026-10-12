@@ -8,6 +8,7 @@
     "dev": "node --watch index.mjs"
   },
   "dependencies": {
+    "@solana/web3.js": "^1.95.8",
     "express": "^4.21.1",
     "ws": "^8.18.0"
   }

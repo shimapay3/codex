@@ -6,7 +6,7 @@ import path from 'node:path'
 const DATA_DIR = process.env.DATA_DIR || '/data'
 const FILE = path.join(DATA_DIR, 'store.json')
 
-let state = { backups: {}, watches: {} }
+let state = { backups: {}, watches: {}, airdrops: { records: {}, ipLog: {}, dailyCount: 0, dailyResetAt: 0 } }
 
 function ensureDir() {
   try {
@@ -24,6 +24,7 @@ export function load() {
     state = {
       backups: parsed.backups && typeof parsed.backups === 'object' ? parsed.backups : {},
       watches: parsed.watches && typeof parsed.watches === 'object' ? parsed.watches : {},
+      airdrops: parsed.airdrops && typeof parsed.airdrops === 'object' ? parsed.airdrops : { records: {}, ipLog: {}, dailyCount: 0, dailyResetAt: 0 },
     }
   } catch {
     state = { backups: {}, watches: {} }
