@@ -155,7 +155,24 @@ async function fetchSolBalance(rpcUrl, owner) {
 
 async function fetchRecentTxs(rpcUrl, owner, limit = 15) {
   try {
-    const signatures = await rpcMethod(rpcUrl, 'getSignaturesForAddress', [owner, { limit }])
+    // Token-2022 signatures are indexed by the Associated Token Account
+    // address, not the owner's system account. Resolve the ATA first so
+    // sent transactions appear in the history.
+    let queryAddress = owner
+    try {
+      const { getAssociatedTokenAddress, PublicKey } = await import('@solana/spl-token')
+      const ata = await getAssociatedTokenAddress(
+        new PublicKey(USDC_MINT),
+        new PublicKey(owner),
+        false,
+        new PublicKey(TOKEN_2022),
+      )
+      queryAddress = ata.toBase58()
+    } catch {
+      // Fallback to owner address if ATA resolution fails
+    }
+
+    const signatures = await rpcMethod(rpcUrl, 'getSignaturesForAddress', [queryAddress, { limit }])
     if (!Array.isArray(signatures) || signatures.length === 0) return []
 
     const entries = await Promise.all(

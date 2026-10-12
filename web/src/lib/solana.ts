@@ -439,8 +439,24 @@ export async function fetchTokenHistory(
   mint = USDC_MINT,
   limit = 25,
 ): Promise<TxEntry[]> {
+  // Token-2022 signatures are indexed by the Associated Token Account address,
+  // not the owner's system account. Resolve the ATA first so sent transactions
+  // appear in the history.
+  let queryAddress = owner
+  try {
+    const ata = await getAssociatedTokenAddress(
+      new PublicKey(mint),
+      new PublicKey(owner),
+      false,
+      USDC_TOKEN_PROGRAM,
+    )
+    queryAddress = ata.toBase58()
+  } catch {
+    // Fallback to owner address if ATA resolution fails
+  }
+
   const signatures = await rpcFetch<any[]>(rpcUrl, 'getSignaturesForAddress', [
-    owner,
+    queryAddress,
     { limit },
   ])
   if (!Array.isArray(signatures) || signatures.length === 0) return []
