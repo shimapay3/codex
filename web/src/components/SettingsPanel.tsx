@@ -248,7 +248,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
           />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-semibold">{tgName}</p>
-            <p className="truncate text-[11px] text-[color:var(--muted)]">{tgUsername || 'Object None'}</p>
+            <p className="truncate text-[11px] text-[color:var(--muted)]">{tgUsername || 'Chưa có username'}</p>
           </div>
           <button
             type="button"
@@ -262,21 +262,21 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
             className="flex shrink-0 items-center gap-1 rounded-xl border border-[color:var(--border)] px-2.5 py-1.5 text-[10.5px] font-semibold"
           >
             {tgCopied ? <Check size={12} /> : <Copy size={12} />}
-            {tgId ? `ID: ${tgId}` : 'Object None'}
+            {tgId ? `ID: ${tgId}` : 'Không có ID'}
           </button>
         </div>
 
         <Row label="Mã PIN">
           <span className="text-[12px] font-semibold">{pinEnabled ? 'Đang bật' : 'Chưa đặt'}</span>
         </Row>
+        <input
+          inputMode="numeric"
+          value={pinDraft}
+          onChange={(event) => setPinDraft(event.target.value.replace(/\D/g, '').slice(0, 6))}
+          placeholder="PIN 6 số"
+          className="w-full rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 text-center text-[15px] tracking-[0.35em] outline-none focus:border-[color:var(--accent)]"
+        />
         <div className="flex gap-2">
-          <input
-            inputMode="numeric"
-            value={pinDraft}
-            onChange={(event) => setPinDraft(event.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="PIN 6 số"
-            className="flex-1 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 text-center text-[15px] tracking-[0.35em] outline-none focus:border-[color:var(--accent)]"
-          />
           <button
             type="button"
             disabled={pinDraft.length < 6}
@@ -288,7 +288,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
                 toast({ tone: 'error', title: 'PIN không hợp lệ', body: error?.message })
               }
             }}
-            className="rounded-2xl border border-[color:var(--border)] px-4 text-[12.5px] font-semibold disabled:opacity-45"
+            className="flex-1 rounded-2xl border border-[color:var(--border)] py-3 text-[12.5px] font-semibold disabled:opacity-45"
           >
             Lưu PIN
           </button>
@@ -296,7 +296,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
             <button
               type="button"
               onClick={clearPin}
-              className="rounded-2xl border border-[color:var(--border)] px-3 text-[12.5px] font-semibold text-[#ff8fa1]"
+              className="rounded-2xl border border-[color:var(--border)] px-4 py-3 text-[12.5px] font-semibold text-[#ff8fa1]"
             >
               Xoá
             </button>

@@ -80,7 +80,7 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
           <div className="min-w-0 flex-1">
             <p className="truncate text-[14px] font-semibold">{tgName}</p>
             <p className="truncate text-[11px] text-[color:var(--muted)]">
-              {tgUsername || 'Object None'}
+              {tgUsername || 'Chưa có username'}
             </p>
           </div>
           <button
@@ -95,7 +95,7 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
             className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[color:var(--border)] px-2.5 py-1.5 text-[10.5px] font-semibold"
           >
             {copied ? <Check size={12} /> : <Copy size={12} />}
-            {tgId ? `ID: ${tgId}` : 'Object None'}
+            {tgId ? `ID: ${tgId}` : 'Không có ID'}
           </button>
         </div>
       )}

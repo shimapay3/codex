@@ -54,7 +54,7 @@ export function getTelegramPhotoUrl(): string | null {
 /** Display name: "first_name last_name" or username, falling back to id. */
 export function getTelegramDisplayName(): string {
   const user = getTelegramUser()
-  if (!user) return 'Object None'
+  if (!user) return 'Khách'
   const name = [user.first_name, user.last_name].filter(Boolean).join(' ')
   if (name) return name
   if (user.username) return `@${user.username}`

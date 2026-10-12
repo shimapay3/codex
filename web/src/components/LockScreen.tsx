@@ -102,7 +102,7 @@ export default function LockScreen() {
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-semibold">{tgName}</p>
           <p className="truncate text-[10.5px] text-[color:var(--muted)]">
-            {tgUsername || 'Object None'} {tgId ? `· ID: ${tgId}` : ''}
+            {tgUsername || 'Chưa có username'} {tgId ? `· ID: ${tgId}` : ''}
           </p>
         </div>
       </div>
