@@ -238,7 +238,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
         </Row>
       </Section>
 
-      <Section icon={<KeyRound size={15} />} title="Telegram & PIN" hint="Định danh Telegram là cơ sở bảo mật. Mã PIN 4–6 số khoá két ví trên thiết bị.">
+      <Section icon={<KeyRound size={15} />} title="Telegram & PIN" hint="Định danh Telegram là cơ sở bảo mật. Mã PIN 6 số khoá két ví trên thiết bị.">
         <div className="flex items-center gap-3 rounded-2xl bg-[color:var(--surface)] px-3.5 py-3">
           <img
             src={tgPhoto || TELEGRAM_LOGO}
@@ -274,12 +274,12 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
             inputMode="numeric"
             value={pinDraft}
             onChange={(event) => setPinDraft(event.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="PIN 4–6 số"
+            placeholder="PIN 6 số"
             className="flex-1 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 text-center text-[15px] tracking-[0.35em] outline-none focus:border-[color:var(--accent)]"
           />
           <button
             type="button"
-            disabled={pinDraft.length < 4}
+            disabled={pinDraft.length < 6}
             onClick={async () => {
               try {
                 await setPin(pinDraft)

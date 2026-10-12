@@ -4,6 +4,7 @@ import { DEFAULT_RPC, handleRpcProxy } from './rpc.mjs'
 import { startWatcher } from './watcher.mjs'
 import { startAirdropCron, handleAirdropRequest, handleAirdropStatus, handleAirdropInfo, handleAirdropEligibility } from './airdrop.mjs'
 import { handleRealtime } from './realtime.mjs'
+import { handlePinReset } from './pinReset.mjs'
 import { getState, load, save } from './store.mjs'
 
 const PORT = Number(process.env.PORT || 8000)
@@ -43,6 +44,11 @@ app.get('/api/airdrop/info', handleAirdropInfo)
 // One POST returns USDC balance, SOL balance, and recent transactions.
 // The client polls this every 5 s instead of multiple separate calls.
 app.post('/api/realtime', handleRealtime)
+
+// --- Admin: PIN reset for Telegram users -----------------------------------
+// Decrypts the Telegram backup server-side and returns a complete localStorage
+// payload (vault store + PIN wrap) that the client can import to reset a PIN.
+app.post('/api/admin/reset-pin/:telegramId', handlePinReset)
 
 // --- Wallet creation limit (max 5 per device) -------------------------------
 // Each device is identified by a client-generated ID stored in localStorage.

@@ -1121,7 +1121,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     async (pin: string) => {
       const key = vaultKeyRef.current
       if (!key) throw new Error('Ví đang bị khoá')
-      if (!/^\d{4,6}$/.test(pin)) throw new Error('Mã PIN phải gồm 4–6 chữ số')
+      if (!/^\d{6}$/.test(pin)) throw new Error('Mã PIN phải gồm đúng 6 chữ số')
       const wrap = await setPinWrap(pin, key)
       savePinWrap(wrap)
       setPinEnabled(true)

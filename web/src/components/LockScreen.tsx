@@ -58,10 +58,6 @@ export default function LockScreen() {
     if (busy) return
     const next = (pin + digit).slice(0, 6)
     setPin(next)
-    if (next.length >= 4 && next.length === 6) void submitPin(next)
-    else if (next.length >= 4) {
-      // Auto-submit at 6 digits, or allow manual submit at 4-5
-    }
     if (next.length === 6) void submitPin(next)
   }
 
