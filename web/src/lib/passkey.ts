@@ -82,8 +82,8 @@ export async function registerPasskey(label: string): Promise<RegisterOutcome> {
   const credential = (await navigator.credentials.create({
     publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
-      rp: { name: 'Cloud Pay Wallet' },
-      user: { id: userId, name: label || 'Cloud Pay', displayName: label || 'Cloud Pay' },
+      rp: { name: 'XPay Wallet' },
+      user: { id: userId, name: label || 'XPay', displayName: label || 'XPay' },
       pubKeyCredParams: [
         { type: 'public-key', alg: -7 }, // ES256
         { type: 'public-key', alg: -257 }, // RS256
@@ -108,7 +108,7 @@ export async function registerPasskey(label: string): Promise<RegisterOutcome> {
   const record: PasskeyRecord = {
     credentialId: b64url(new Uint8Array(credential.rawId)),
     userId: b64url(userId),
-    label: label || 'Cloud Pay',
+    label: label || 'XPay',
     createdAt: Date.now(),
     prf: !!prfBytes,
     prfCheck: prfBytes ? bytesToB64(await prfVerifier(prfBytes)) : undefined,

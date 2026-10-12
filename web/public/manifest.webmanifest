@@ -1,7 +1,7 @@
 {
-  "name": "Cloud Pay Wallet",
-  "short_name": "Cloud Pay",
-  "description": "Ví Solana (Cloud Chain) đa ví, thanh toán USDC bằng Passkey, thông báo realtime.",
+  "name": "XPay Wallet",
+  "short_name": "XPay",
+  "description": "Ví Solana (Cloud Chain) đa ví, thanh toán USDC, thông báo realtime.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

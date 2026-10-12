@@ -25,7 +25,7 @@ export default function TelegramGuide() {
       <div className="flex flex-col items-center text-center">
         <Logo size={70} />
         <h1 className="mt-4 text-[24px] font-semibold tracking-tight">
-          Cloud <span className="accent-text">Pay</span> Wallet
+          X<span className="accent-text">Pay</span> Wallet
         </h1>
         <p className="mt-1 text-[12.5px] text-[color:var(--muted)]">
           Ví thanh toán USDC trên Cloud Chain
@@ -53,7 +53,7 @@ export default function TelegramGuide() {
         </div>
         <h2 className="text-[17px] font-semibold">Cần mở trong Telegram</h2>
         <p className="mt-2 text-[13px] leading-relaxed text-[color:var(--muted)]">
-          Cloud Pay Wallet chạy như một ứng dụng Telegram Mini App. Vui lòng mở
+          XPay Wallet chạy như một ứng dụng Telegram Mini App. Vui lòng mở
           liên kết này từ bên trong Telegram để tiếp tục.
         </p>
       </div>
@@ -82,7 +82,7 @@ export default function TelegramGuide() {
       </div>
 
       <p className="mt-6 text-center text-[11px] leading-relaxed text-[color:var(--muted)]">
-        Sau khi cài đặt Telegram, mở liên kết Cloud Pay Wallet từ Telegram để
+        Sau khi cài đặt Telegram, mở liên kết XPay Wallet từ Telegram để
         truy cập ví của bạn.
       </p>
     </div>

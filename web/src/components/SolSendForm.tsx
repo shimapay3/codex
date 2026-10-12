@@ -23,6 +23,7 @@ export default function SolSendForm() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [signature, setSignature] = useState<string | null>(null)
+  const [maxPending, setMaxPending] = useState(false)
 
   const amount = Number.parseFloat(amountText.replace(/,/g, '.')) || 0
   const validTo = isValidAddress(to) && to.trim() !== activeWallet?.address
@@ -155,7 +156,7 @@ export default function SolSendForm() {
           ))}
           <button
             type="button"
-            onClick={() => setAmountText(String(Math.floor(maxSend * 1e9) / 1e9))}
+            onClick={() => setMaxPending(true)}
             className="shrink-0 rounded-xl accent-gradient px-3 py-1.5 text-[12px] font-semibold text-white"
           >
             Tối đa
@@ -319,6 +320,42 @@ export default function SolSendForm() {
         <div className="flex items-start gap-2 rounded-2xl border border-[#ff6b81]/40 bg-[#ff6b81]/10 px-3.5 py-3 text-[12px] text-[#ff8fa1]">
           <AlertTriangle size={15} className="mt-0.5 shrink-0" />
           <span className="leading-relaxed">{error}</span>
+        </div>
+      )}
+
+      {maxPending && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
+          onClick={() => setMaxPending(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-[28px] glass-strong p-5 shadow-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-[15px] font-semibold">Xác nhận gửi tối đa?</p>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-[color:var(--muted)]">
+              Bạn sẽ gửi tối đa {maxSend.toLocaleString('en-US', { maximumFractionDigits: 6 })} SOL (giữ lại ≈ 0.001 SOL cho phí).
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMaxPending(false)}
+                className="rounded-2xl border border-[color:var(--border)] py-3.5 text-[13px] font-semibold"
+              >
+                Huỷ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAmountText(String(Math.floor(maxSend * 1e9) / 1e9))
+                  setMaxPending(false)
+                }}
+                className="rounded-2xl accent-gradient py-3.5 text-[13px] font-semibold text-white"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

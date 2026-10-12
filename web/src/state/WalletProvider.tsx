@@ -75,7 +75,7 @@ export const DEFAULT_PREFS: Prefs = {
   accentColor: null,
   rpcUrl: DEFAULT_RPC_URL,
   priceEndpoint: '',
-  autoLockMinutes: 5,
+  autoLockMinutes: 15,
   fiat: 'both',
   notifications: true,
   sound: true,
@@ -404,6 +404,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const currentKey = vaultKeyRef.current
       if (!currentVault || !currentKey) throw new Error('Ví đang bị khoá')
 
+      // Reject duplicate wallet address
+      const newAddress = result.keypair.publicKey.toBase58()
+      if (currentVault.wallets.some((w) => w.address === newAddress)) {
+        throw new Error('Ví với địa chỉ này đã tồn tại')
+      }
       // Enforce wallet limit: max MAX_WALLETS per device (client + server).
       if (currentVault.wallets.length >= MAX_WALLETS) {
         throw new Error(`Đã đạt giới hạn ${MAX_WALLETS} ví cho thiết bị này`)

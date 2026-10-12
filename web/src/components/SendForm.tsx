@@ -40,7 +40,9 @@ export default function SendForm() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [signature, setSignature] = useState<string | null>(null)
+  const [maxPending, setMaxPending] = useState(false)
 
+  const maxAmount = Math.floor(balance.usdc * 1e6) / 1e6
   const amount = parseAmountInput(amountText, balance.decimals || 6)
   const memo = useMemo(() => buildMemo(categoryId, wish, note), [categoryId, wish, note])
   const validTo = isValidAddress(to) && to.trim() !== activeWallet?.address
@@ -183,7 +185,7 @@ export default function SendForm() {
           ))}
           <button
             type="button"
-            onClick={() => setAmountText(String(Math.floor(balance.usdc * 1e6) / 1e6))}
+            onClick={() => setMaxPending(true)}
             className="shrink-0 rounded-xl accent-gradient px-3 py-1.5 text-[12px] font-semibold text-white"
           >
             Tối đa
@@ -417,6 +419,42 @@ export default function SendForm() {
         Token duy nhất: USDC (Cloud Chain) · {prefs.rpcUrl.replace(/^https?:\/\//, '')}
       </p>
       <p className="px-1 font-mono text-[9.5px] break-all text-[color:var(--muted)]">{USDC_MINT}</p>
+
+      {maxPending && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
+          onClick={() => setMaxPending(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-[28px] glass-strong p-5 shadow-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-[15px] font-semibold">Xác nhận gửi tối đa?</p>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-[color:var(--muted)]">
+              Bạn sẽ gửi toàn bộ số dư {formatAmount(maxAmount, 2)} USDC. Sau giao dịch, ví sẽ không còn USDC.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMaxPending(false)}
+                className="rounded-2xl border border-[color:var(--border)] py-3.5 text-[13px] font-semibold"
+              >
+                Huỷ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAmountText(String(maxAmount))
+                  setMaxPending(false)
+                }}
+                className="rounded-2xl accent-gradient py-3.5 text-[13px] font-semibold text-white"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

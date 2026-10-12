@@ -36,7 +36,7 @@ export default function ReceivePanel() {
   }, [address])
 
   const shareText = useMemo(
-    () => `Ví Cloud Pay của tôi (Cloud Chain)\n${address}\nChỉ gửi USDC trên mạng Cloud Chain.`,
+    () => `Ví XPay của tôi (Cloud Chain)\n${address}\nChỉ gửi USDC trên mạng Cloud Chain.`,
     [address],
   )
 
@@ -50,7 +50,7 @@ export default function ReceivePanel() {
   const handleShare = async () => {
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'Địa chỉ ví Cloud Pay', text: shareText })
+        await navigator.share({ title: 'Địa chỉ ví XPay', text: shareText })
         return
       }
     } catch {

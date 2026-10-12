@@ -66,7 +66,7 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
       <div className="flex flex-col items-center text-center">
         <Logo size={70} />
         <h1 className="mt-4 text-[24px] font-semibold tracking-tight">
-          Cloud <span className="accent-text">Pay</span> Wallet
+          X<span className="accent-text">Pay</span> Wallet
         </h1>
         <p className="mt-1 text-[12.5px] text-[color:var(--muted)]">
           Ví thanh toán USDC trên mạng Cloud Chain
@@ -315,38 +315,40 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
                 <KeyRound size={17} className="accent-text" /> Mã PIN bảo vệ
               </p>
               <p className="mt-1.5 text-[11.5px] leading-relaxed text-[color:var(--muted)]">
-                Tạo mã PIN 4–6 chữ số để khoá và mở ví. Đây là lớp bảo mật chính
+                Tạo mã PIN 6 chữ số để khoá và mở ví. Đây là lớp bảo mật chính
                 cùng với định danh Telegram của bạn.
               </p>
-              <div className="relative mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <input
                   type={showPin ? 'text' : 'password'}
                   inputMode="numeric"
                   value={pin}
                   onChange={(event) => setPinValue(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="PIN 4–6 số"
+                  placeholder="PIN 6 số"
                   className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 text-center text-[16px] tracking-[0.4em] outline-none focus:border-[color:var(--accent)]"
                 />
-                <input
-                  type={showPin ? 'text' : 'password'}
-                  inputMode="numeric"
-                  value={pin2}
-                  onChange={(event) => setPin2(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="Nhập lại"
-                  className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 text-center text-[16px] tracking-[0.4em] outline-none focus:border-[color:var(--accent)]"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPin((v) => !v)}
-                  aria-label={showPin ? 'Ẩn PIN' : 'Hiện PIN'}
-                  className="absolute -right-9 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[color:var(--muted)] transition hover:bg-white/10"
-                >
-                  {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+                <div className="relative">
+                  <input
+                    type={showPin ? 'text' : 'password'}
+                    inputMode="numeric"
+                    value={pin2}
+                    onChange={(event) => setPin2(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Nhập lại"
+                    className="w-full rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 pr-10 text-center text-[16px] tracking-[0.4em] outline-none focus:border-[color:var(--accent)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin((v) => !v)}
+                    aria-label={showPin ? 'Ẩn PIN' : 'Hiện PIN'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[color:var(--muted)] transition hover:bg-white/10"
+                  >
+                    {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <button
                 type="button"
-                disabled={busy || pin.length < 4 || pin !== pin2}
+                disabled={busy || pin.length < 6 || pin !== pin2}
                 onClick={() =>
                   run(async () => {
                     await setPin(pin)

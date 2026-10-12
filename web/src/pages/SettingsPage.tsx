@@ -9,7 +9,7 @@ export default function SettingsPage() {
       <header className="px-1">
         <h1 className="text-[20px] font-semibold tracking-tight">Cài đặt</h1>
         <p className="mt-0.5 text-[12px] text-[color:var(--muted)]">
-          Mạng, bảo mật Passkey, thông báo và sao lưu
+          Mạng, bảo mật dữ liệu, thông báo và sao lưu
         </p>
       </header>
       <SettingsPanel onOpenTheme={() => setThemeOpen(true)} />

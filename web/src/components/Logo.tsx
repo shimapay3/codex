@@ -19,7 +19,7 @@ export default function Logo({ size = 40, withRing = true, className }: Props) {
       viewBox="0 0 512 512"
       className={className}
       role="img"
-      aria-label="Cloud Pay Wallet"
+      aria-label="XPay Wallet"
     >
       <defs>
         <linearGradient id={grad} x1="0" y1="0" x2="1" y2="1">
@@ -70,7 +70,7 @@ export function LogoWordmark({ compact = false }: { compact?: boolean }) {
       <Logo size={compact ? 32 : 38} />
       <div className="leading-none">
         <div className="text-[15px] font-semibold tracking-tight">
-          Cloud <span className="accent-text">Pay</span>
+          X<span className="accent-text">Pay</span>
         </div>
         <div className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-[color:var(--muted)]">
           Cloud Chain

@@ -488,7 +488,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
 
       <Section icon={<KeyRound size={15} />} title="Về ứng dụng">
         <p className="text-[11.5px] leading-relaxed text-[color:var(--muted)]">
-          Cloud Pay Wallet · Cloud Chain · mạng Solana. Token duy nhất: <b>USDC</b> (đã xác minh). Mọi khoá
+          XPay Wallet · Cloud Chain · mạng Solana. Token duy nhất: <b>USDC</b> (đã xác minh). Mọi khoá
           bí mật được sinh và mã hoá ngay trên thiết bị; máy chủ chỉ đóng vai trò RPC proxy, thông báo
           realtime và lưu trữ bản sao lưu đã mã hoá.
         </p>

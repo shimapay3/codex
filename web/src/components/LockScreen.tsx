@@ -87,7 +87,7 @@ export default function LockScreen() {
           <Logo size={76} />
         </div>
         <h1 className="mt-4 text-[22px] font-semibold tracking-tight">
-          Cloud <span className="accent-text">Pay</span> Wallet
+          X<span className="accent-text">Pay</span> Wallet
         </h1>
         <p className="mt-1 flex items-center gap-1.5 text-[12px] text-[color:var(--muted)]">
           <Lock size={12} /> Két đã khoá · Cloud Chain
