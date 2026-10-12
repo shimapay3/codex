@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from 'recharts'
+import { Area, AreaChart, Line, LineChart, ResponsiveContainer, Tooltip, YAxis } from 'recharts'
 import { Loader2, TrendingUp } from 'lucide-react'
 import { BalanceSample } from '../state/vault'
 import { useWallet } from '../state/WalletProvider'
@@ -47,6 +47,21 @@ export default function BalanceChart({ height = 132 }: { height?: number }) {
   const rising = values[values.length - 1] >= values[0]
   const hasData = samples.length > 0 || balance.usdc > 0
 
+  // Demo data for new wallets — a gentle upward line so the user sees what
+  // the chart will look like once real balance samples arrive.
+  const demoData = useMemo(() => {
+    const now = Date.now()
+    const demoValues = [0, 12.5, 8.3, 24.7, 18.1, 31.2, 28.5, 42.0]
+    return demoValues.map((amount, i) => ({
+      t: now - (demoValues.length - 1 - i) * 60000,
+      amount,
+      time: new Date(now - (demoValues.length - 1 - i) * 60000).toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    }))
+  }, [])
+
   return (
     <div className="relative">
       <div className="mb-2 flex items-center justify-between">
@@ -60,7 +75,11 @@ export default function BalanceChart({ height = 132 }: { height?: number }) {
             color: rising ? '#22e07a' : '#ff4d6d',
           }}
         >
-          {rising ? '▲' : '▼'} realtime
+          {hasData ? (
+            <>{rising ? '▲' : '▼'} realtime</>
+          ) : (
+            <span style={{ background: 'rgba(255,176,32,.16)', color: '#ffb020' }}>demo</span>
+          )}
         </span>
       </div>
       {balance.loading && !hasData ? (
@@ -68,9 +87,43 @@ export default function BalanceChart({ height = 132 }: { height?: number }) {
           <Loader2 size={20} className="animate-spin text-[color:var(--muted)]" />
         </div>
       ) : !hasData ? (
-        <div style={{ height }} className="flex flex-col items-center justify-center gap-1.5 text-center">
-          <p className="text-[12px] text-[color:var(--muted)]">Chưa có dữ liệu số dư</p>
-          <p className="text-[10.5px] text-[color:var(--muted)] opacity-70">Đang chờ kết nối RPC…</p>
+        <div style={{ height }} className="relative">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={demoData} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id="demo-stroke" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.5} />
+                  <stop offset="100%" stopColor="var(--accent-2)" stopOpacity={0.5} />
+                </linearGradient>
+              </defs>
+              <YAxis hide domain={[0, 'auto']} />
+              <Tooltip
+                content={({ active: a, payload }) => {
+                  if (!a || !payload?.length) return null
+                  const p = payload[0].payload as any
+                  return (
+                    <div className="rounded-xl glass-strong px-2.5 py-1.5 text-[11px] shadow-card">
+                      <p className="font-semibold">{formatAmount(p.amount, 2)} USDC</p>
+                      <p className="text-[color:var(--muted)]">{p.time}</p>
+                    </div>
+                  )
+                }}
+                cursor={{ stroke: 'var(--border)' }}
+              />
+              <Line
+                type="monotone"
+                dataKey="amount"
+                stroke="url(#demo-stroke)"
+                strokeWidth={2}
+                strokeDasharray="5 4"
+                dot={false}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+          <p className="absolute bottom-1 left-0 right-0 text-center text-[10px] text-[color:var(--muted)] opacity-60">
+            Biểu đồ mẫu — dữ liệu thực sẽ hiển thị khi ví nhận USDC
+          </p>
         </div>
       ) : (
         <div style={{ height }}>
