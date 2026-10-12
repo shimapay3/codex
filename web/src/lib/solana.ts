@@ -678,6 +678,47 @@ export function formatSolBalance(sol: number): string {
   return `◎${sol.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} SOL`
 }
 
+// --- User data cloud sync (contacts, prefs, samples by Telegram ID) --------
+
+export type UserCloudData = {
+  contacts: Array<{ id: string; name: string; address: string; note?: string; createdAt: number; favorite?: boolean }>
+  prefs: Record<string, unknown> | null
+  samples: Array<{ t: number; amount: number }>
+  updatedAt: number | null
+}
+
+export async function fetchUserCloudData(telegramId: string): Promise<UserCloudData | null> {
+  try {
+    const res = await fetch(`/api/user/data/${encodeURIComponent(telegramId)}`)
+    if (!res.ok) return null
+    const json = await res.json()
+    return {
+      contacts: Array.isArray(json.contacts) ? json.contacts : [],
+      prefs: json.prefs || null,
+      samples: Array.isArray(json.samples) ? json.samples : [],
+      updatedAt: json.updatedAt || null,
+    }
+  } catch {
+    return null
+  }
+}
+
+export async function pushUserCloudData(
+  telegramId: string,
+  data: { contacts?: unknown[]; prefs?: unknown; samples?: unknown[] },
+): Promise<boolean> {
+  try {
+    const res = await fetch('/api/user/data', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ telegramId, ...data }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 export async function fetchPrice(endpoint?: string): Promise<PriceInfo> {
   const query = endpoint?.trim() ? `?endpoint=${encodeURIComponent(endpoint.trim())}` : ''
   try {

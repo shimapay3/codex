@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import {
+  AlertTriangle,
   BellRing,
   Check,
   Copy,
   Download,
+  Eye,
+  EyeOff,
   Gauge,
   HardDriveDownload,
   KeyRound,
@@ -27,6 +30,7 @@ import {
   getTelegramUsername,
   getTelegramUserIdString,
   getTelegramPhotoUrl,
+  isTelegramWebApp,
   TELEGRAM_LOGO,
 } from '../lib/telegram'
 
@@ -114,6 +118,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
   const [endpointDraft, setEndpointDraft] = useState(prefs.priceEndpoint)
   const [testing, setTesting] = useState(false)
   const [pinDraft, setPinDraft] = useState('')
+  const [showPin, setShowPin] = useState(false)
   const [revealed, setRevealed] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
 
@@ -264,13 +269,24 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
         <Row label="Mã PIN">
           <span className="text-[12px] font-semibold">{pinEnabled ? 'Đang bật' : 'Chưa đặt'}</span>
         </Row>
-        <input
-          inputMode="numeric"
-          value={pinDraft}
-          onChange={(event) => setPinDraft(event.target.value.replace(/\D/g, '').slice(0, 6))}
-          placeholder="PIN 6 số"
-          className="w-full rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 text-center text-[15px] tracking-[0.35em] outline-none focus:border-[color:var(--accent)]"
-        />
+        <div className="relative">
+          <input
+            type={showPin ? 'text' : 'password'}
+            inputMode="numeric"
+            value={pinDraft}
+            onChange={(event) => setPinDraft(event.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="PIN 6 số"
+            className="w-full rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 pr-11 text-center text-[15px] tracking-[0.35em] outline-none focus:border-[color:var(--accent)]"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPin((v) => !v)}
+            aria-label={showPin ? 'Ẩn PIN' : 'Hiện PIN'}
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[color:var(--muted)] transition hover:bg-white/10"
+          >
+            {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
         <div className="flex gap-2">
           <button
             type="button"
@@ -456,6 +472,19 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
           </div>
         )}
       </Section>
+
+      {!isTelegramWebApp() && (
+        <div className="flex items-start gap-3 rounded-[22px] border border-[#f0ad4e]/30 bg-[#f0ad4e]/10 p-4">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-[#f0ad4e]" />
+          <div>
+            <p className="text-[13px] font-semibold text-[#f0ad4e]">Lưu cục bộ</p>
+            <p className="mt-1 text-[11.5px] leading-relaxed text-[color:var(--muted)]">
+              Không có kết nối Telegram — Danh bạ, tăng trưởng số dư và thông số cài đặt chỉ lưu trên thiết bị này.
+              Mở trong Telegram để đồng bộ lên đám mây theo Telegram ID.
+            </p>
+          </div>
+        </div>
+      )}
 
       <Section icon={<KeyRound size={15} />} title="Về ứng dụng">
         <p className="text-[11.5px] leading-relaxed text-[color:var(--muted)]">

@@ -125,7 +125,9 @@ function parseMnemonic(input: string): Uint8Array | null {
  * (derived deterministically so the same phrase always restores the wallet).
  */
 export async function importSecret(input: string): Promise<ImportResult> {
-  const value = input.trim()
+  // Strip BOM (\uFEFF) that some browsers prepend when reading uploaded files,
+  // plus zero-width chars that can sneak in via copy-paste.
+  const value = input.replace(/^\uFEFF/, '').replace(/[\u200B-\u200D\u2060]/g, '').trim()
   if (!value) throw new Error('Hãy nhập khoá bí mật')
 
   const finish = (keypair: Keypair, kind: ImportKind): ImportResult => ({

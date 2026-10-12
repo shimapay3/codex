@@ -17,6 +17,14 @@ import { getState } from './store.mjs'
 const USDC_MINT = 'USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2'
 const TOKEN_2022 = 'TokenzQdBNbLqP5VEhPkASv1L5Xuo6YHuHD4qLm9Q'
 
+const EXPLORER_BASE = 'https://explorer.dolaxanh.com'
+const EXPLORER_CUSTOM_URL = 'https://localusd.cloud/'
+
+function explorerTxUrl(signature) {
+  const params = new URLSearchParams({ cluster: 'custom', customUrl: EXPLORER_CUSTOM_URL })
+  return `${EXPLORER_BASE}/tx/${signature}?${params.toString()}`
+}
+
 const FIXED_USD = 1
 const FIXED_VND = 30000
 const PRICE_ENDPOINT = (process.env.PRICE_ENDPOINT || '').trim()
@@ -216,6 +224,7 @@ async function fetchRecentTxs(rpcUrl, owner, limit = 15) {
             status: item.err || tx?.meta?.err ? 'failed' : 'success',
             memo,
             counterparty: others[0]?.owner ?? null,
+            explorerUrl: explorerTxUrl(item.signature),
           }
         } catch {
           return null

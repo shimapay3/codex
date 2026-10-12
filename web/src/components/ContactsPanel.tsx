@@ -4,6 +4,7 @@ import { useWallet } from '../state/WalletProvider'
 import { Contact } from '../state/vault'
 import { isValidAddress, shortAddress } from '../lib/crypto'
 import { copyToClipboard } from '../lib/format'
+import { isTelegramWebApp } from '../lib/telegram'
 
 const emptyDraft = { name: '', address: '', note: '' }
 
@@ -209,7 +210,9 @@ export default function ContactsPanel() {
       )}
 
       <p className="px-1 text-[10.5px] leading-relaxed text-[color:var(--muted)]">
-        Danh bạ được mã hoá cùng két và tự động sao lưu lên đám mây cá nhân của bạn.
+        {isTelegramWebApp()
+          ? '☁️ Lưu đám mây — đồng bộ theo Telegram ID, dùng được trên mọi thiết bị.'
+          : '💾 Lưu cục bộ — mở trong Telegram để đồng bộ danh bạ lên đám mây.'}
       </p>
     </div>
   )

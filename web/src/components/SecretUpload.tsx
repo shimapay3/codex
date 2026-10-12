@@ -11,10 +11,23 @@ export default function SecretUpload({ onLoad }: { onLoad: (text: string) => voi
   const handleFile = (file: File) => {
     const reader = new FileReader()
     reader.onload = () => {
-      const text = String(reader.result || '').trim()
+      // Strip BOM (\uFEFF) — some browsers prepend it when reading UTF-8
+      // files, which breaks JSON parsing and secret matching.
+      const text = String(reader.result || '').replace(/^\uFEFF/, '').trim()
       if (text) onLoad(text)
     }
-    reader.readAsText(file)
+    reader.onerror = () => {
+      // Fallback: read as ArrayBuffer and decode manually
+      const abReader = new FileReader()
+      abReader.onload = () => {
+        try {
+          const text = new TextDecoder('utf-8').decode(abReader.result as ArrayBuffer).replace(/^\uFEFF/, '').trim()
+          if (text) onLoad(text)
+        } catch { /* give up */ }
+      }
+      abReader.readAsArrayBuffer(file)
+    }
+    reader.readAsText(file, 'utf-8')
   }
 
   return (

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import {
   ArrowRight,
   Download,
+  Eye,
+  EyeOff,
   KeyRound,
   Loader2,
   ShieldCheck,
@@ -39,6 +41,8 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
   const [pin2, setPin2] = useState('')
   const [copied, setCopied] = useState(false)
   const [solWarning, setSolWarning] = useState<string | null>(null)
+  const [showSecret, setShowSecret] = useState(false)
+  const [showPin, setShowPin] = useState(false)
 
   const tgName = getTelegramDisplayName()
   const tgUsername = getTelegramUsername()
@@ -222,14 +226,25 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
               <p className="mb-2 text-[13px] font-semibold">
                 Nhập khoá bí mật
               </p>
-              <textarea
-                value={secret}
-                onChange={(event) => setSecret(event.target.value)}
-                rows={5}
-                spellCheck={false}
-                placeholder="[12,34,…]  ·  4Zk…  ·  twelve word phrase  ·  passphrase"
-                className="w-full resize-none rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 font-mono text-[12.5px] outline-none focus:border-[color:var(--accent)]"
-              />
+              <div className="relative">
+                <textarea
+                  value={secret}
+                  onChange={(event) => setSecret(event.target.value)}
+                  rows={5}
+                  spellCheck={false}
+                  placeholder="[12,34,…]  ·  4Zk…  ·  twelve word phrase  ·  passphrase"
+                  className="w-full resize-none rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 pr-11 font-mono text-[12.5px] outline-none focus:border-[color:var(--accent)]"
+                  style={{ WebkitTextSecurity: showSecret ? 'none' : 'disc' } as React.CSSProperties}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSecret((v) => !v)}
+                  aria-label={showSecret ? 'Ẩn khoá' : 'Hiện khoá'}
+                  className="absolute right-3 top-3 rounded-lg p-1.5 text-[color:var(--muted)] transition hover:bg-white/10"
+                >
+                  {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               <p className="mt-2 text-[11px] leading-relaxed text-[color:var(--muted)]">
                 Hỗ trợ mảng JSON nhị phân (secretKey), base58, private key hex, cụm 12/24 từ BIP39 và passphrase tự do.
               </p>
@@ -303,8 +318,9 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
                 Tạo mã PIN 4–6 chữ số để khoá và mở ví. Đây là lớp bảo mật chính
                 cùng với định danh Telegram của bạn.
               </p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="relative mt-3 grid grid-cols-2 gap-2">
                 <input
+                  type={showPin ? 'text' : 'password'}
                   inputMode="numeric"
                   value={pin}
                   onChange={(event) => setPinValue(event.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -312,12 +328,21 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
                   className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 text-center text-[16px] tracking-[0.4em] outline-none focus:border-[color:var(--accent)]"
                 />
                 <input
+                  type={showPin ? 'text' : 'password'}
                   inputMode="numeric"
                   value={pin2}
                   onChange={(event) => setPin2(event.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="Nhập lại"
                   className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 text-center text-[16px] tracking-[0.4em] outline-none focus:border-[color:var(--accent)]"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPin((v) => !v)}
+                  aria-label={showPin ? 'Ẩn PIN' : 'Hiện PIN'}
+                  className="absolute -right-9 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[color:var(--muted)] transition hover:bg-white/10"
+                >
+                  {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
               <button
                 type="button"

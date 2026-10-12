@@ -25,6 +25,8 @@ import {
   MAX_WALLETS,
   getWalletCount,
   registerWalletWithServer,
+  fetchUserCloudData,
+  pushUserCloudData,
 } from '../lib/solana'
 import {
   primeAudio,
@@ -283,6 +285,64 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setPrefsState((present) => ({ ...present, ...data.prefs }))
       setSession('unlocked')
       seenRef.current = new Set()
+
+      // Cloud sync: when inside Telegram, fetch contacts/prefs/samples from
+      // the server so they follow the user across devices/browsers.
+      const tgId = getTelegramUserIdString()
+      if (tgId) {
+        try {
+          const cloud = await fetchUserCloudData(tgId)
+          if (cloud) {
+            let merged = data
+            let changed = false
+
+            // Merge contacts — union by address, prefer local favorites
+            if (cloud.contacts.length > 0) {
+              const localByAddr = new Map(data.contacts.map((c) => [c.address, c]))
+              const cloudByAddr = new Map(cloud.contacts.map((c) => [c.address, c]))
+              const mergedContacts = [...localByAddr.values()]
+              for (const [addr, cloudContact] of cloudByAddr) {
+                if (!localByAddr.has(addr)) {
+                  mergedContacts.push(cloudContact)
+                  changed = true
+                }
+              }
+              if (changed) {
+                merged = { ...merged, contacts: mergedContacts }
+              }
+            }
+
+            // Merge samples — union by timestamp, keep all
+            if (cloud.samples.length > 0) {
+              const localTimes = new Set(data.samples.map((s) => s.t))
+              const newSamples = cloud.samples.filter((s) => !localTimes.has(s.t))
+              if (newSamples.length > 0) {
+                const allSamples = [...merged.samples, ...newSamples].sort((a, b) => a.t - b.t).slice(-400)
+                merged = { ...merged, samples: allSamples }
+                changed = true
+              }
+            }
+
+            if (changed) {
+              setVault(merged)
+              vaultRef.current = merged
+              const envelope = await encryptVaultData(vaultKey, merged)
+              const existing = loadStore()
+              if (existing) saveStore({ ...existing, envelope })
+              // Push merged contacts back to cloud
+              void pushUserCloudData(tgId, { contacts: merged.contacts, samples: merged.samples })
+            }
+
+            // Push current contacts to cloud if cloud was empty
+            if (cloud.contacts.length === 0 && data.contacts.length > 0) {
+              void pushUserCloudData(tgId, { contacts: data.contacts, samples: data.samples })
+            }
+          }
+        } catch {
+          /* cloud sync failure is non-fatal */
+        }
+      }
+
       return data
     },
     [],
@@ -620,6 +680,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const current = vaultRef.current
       if (!current) return
       await persist({ ...current, contacts })
+      // Push to cloud when inside Telegram
+      const tgId = getTelegramUserIdString()
+      if (tgId) void pushUserCloudData(tgId, { contacts })
     },
     [persist],
   )

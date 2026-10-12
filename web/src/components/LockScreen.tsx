@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Delete,
+  Eye,
+  EyeOff,
   KeyRound,
   Loader2,
   Lock,
@@ -31,6 +33,7 @@ export default function LockScreen() {
   const [secret, setSecret] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSecret, setShowSecret] = useState(false)
 
   const index = useMemo(() => loadStore()?.index || [], [])
 
@@ -198,14 +201,25 @@ export default function LockScreen() {
                 <p className="text-[11px] text-[color:var(--muted)]">Dự phòng khi quên mã PIN</p>
               </div>
             </div>
-            <textarea
-              value={secret}
-              onChange={(event) => setSecret(event.target.value)}
-              rows={5}
-              spellCheck={false}
-              placeholder="[12,34,…]  ·  4Zk…  ·  twelve word phrase  ·  passphrase"
-              className="w-full resize-none rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 font-mono text-[12.5px] outline-none focus:border-[color:var(--accent)]"
-            />
+            <div className="relative">
+              <textarea
+                value={secret}
+                onChange={(event) => setSecret(event.target.value)}
+                rows={5}
+                spellCheck={false}
+                placeholder="[12,34,…]  ·  4Zk…  ·  twelve word phrase  ·  passphrase"
+                className="w-full resize-none rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 pr-11 font-mono text-[12.5px] outline-none focus:border-[color:var(--accent)]"
+                style={{ WebkitTextSecurity: showSecret ? 'none' : 'disc' } as React.CSSProperties}
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret((v) => !v)}
+                aria-label={showSecret ? 'Ẩn khoá' : 'Hiện khoá'}
+                className="absolute right-3 top-3 rounded-lg p-1.5 text-[color:var(--muted)] transition hover:bg-white/10"
+              >
+                {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
             <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
               Chấp nhận mảng JSON nhị phân, base58, private key hex, cụm 12/24 từ
               hoặc passphrase tự do.

@@ -183,6 +183,55 @@ function normalizeAddress(value) {
   return typeof value === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value) ? value : null
 }
 
+// --- User data sync (contacts, prefs, samples by Telegram ID) -------------
+// When the wallet runs inside Telegram, contacts, settings and balance
+// samples are synced to the server so they follow the user across devices.
+// Without Telegram, everything stays local.
+
+function getUserState() {
+  const state = getState()
+  if (!state.users) state.users = {}
+  return state.users
+}
+
+app.get('/api/user/data/:telegramId', (req, res) => {
+  const tgId = req.params.telegramId
+  if (!tgId || !/^\d+$/.test(tgId)) {
+    res.status(400).json({ error: 'Telegram ID không hợp lệ' })
+    return
+  }
+  const users = getUserState()
+  const user = users[tgId]
+  if (!user) {
+    res.json({ contacts: [], prefs: null, samples: [], updatedAt: null })
+    return
+  }
+  res.json({
+    contacts: user.contacts || [],
+    prefs: user.prefs || null,
+    samples: user.samples || [],
+    updatedAt: user.updatedAt || null,
+  })
+})
+
+app.post('/api/user/data', (req, res) => {
+  const { telegramId, contacts, prefs, samples } = req.body || {}
+  if (!telegramId || !/^\d+$/.test(String(telegramId))) {
+    res.status(400).json({ error: 'Telegram ID không hợp lệ' })
+    return
+  }
+  const users = getUserState()
+  const existing = users[telegramId] || {}
+  users[telegramId] = {
+    contacts: Array.isArray(contacts) ? contacts : existing.contacts || [],
+    prefs: prefs && typeof prefs === 'object' ? prefs : existing.prefs || null,
+    samples: Array.isArray(samples) ? samples : existing.samples || [],
+    updatedAt: Date.now(),
+  }
+  save()
+  res.json({ ok: true, updatedAt: users[telegramId].updatedAt })
+})
+
 load()
 
 const server = http.createServer(app)
