@@ -269,6 +269,19 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     applyTheme(prefs.mode, prefs.accentId, prefs.accentColor || undefined)
     writeLocal(StorageKeys.prefs, prefs)
+    // Persist prefs to the encrypted vault so they survive unlock cycles.
+    // Without this, setPrefs only updates React state + localStorage; on
+    // next unlock the vault's stale prefs overwrite the saved changes.
+    const currentVault = vaultRef.current
+    const currentKey = vaultKeyRef.current
+    if (currentVault && currentKey) {
+      const updatedVault = { ...currentVault, prefs }
+      vaultRef.current = updatedVault
+      void encryptVaultData(currentKey, updatedVault).then((envelope) => {
+        const existing = loadStore()
+        if (existing) saveStore({ ...existing, envelope })
+      })
+    }
   }, [prefs])
 
   const setPrefs = useCallback((patch: Partial<Prefs>) => {
