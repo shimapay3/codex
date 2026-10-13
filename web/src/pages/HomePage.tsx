@@ -23,6 +23,7 @@ import { USDC_MINT } from '../lib/solana'
 import { TELEGRAM_LOGO } from '../lib/telegram'
 import { useTelegramProfile } from '../state/useTelegramProfile'
 import { copyToClipboard } from '../lib/format'
+import { ENABLED_COINS } from '../lib/coins'
 
 export default function HomePage() {
   const {
@@ -180,64 +181,62 @@ export default function HomePage() {
         <BalanceChart />
       </div>
 
-      {/* Assets */}
+      {/* Assets — data-driven from coin registry */}
       <div className="rounded-[26px] glass p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[14px] font-semibold">Tài sản</h2>
-          <span className="text-[10.5px] text-[color:var(--muted)]">2 tài sản</span>
+          <span className="text-[10.5px] text-[color:var(--muted)]">{ENABLED_COINS.length} tài sản</span>
         </div>
         <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => navigate('/receive')}
-            className="flex w-full items-center gap-3 rounded-2xl bg-[color:var(--surface)] p-3 text-left transition hover:bg-[color:var(--surface-strong)] active:scale-[0.99]"
-          >
-            <UsdcAvatar size={40} />
-            <div className="min-w-0 flex-1">
-              <p className="text-[13.5px] font-semibold">USD Coin</p>
-              <p className="font-mono text-[10px] break-all text-[color:var(--muted)]">
-                {shortAddress(USDC_MINT, 8)}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-[14px] font-semibold tabular-nums">
-                {hidden ? '••••' : formatAmount(balance.usdc, 2)}
-              </p>
-              <p className="text-[10.5px] text-[color:var(--muted)]">
-                {hidden ? '≈ ••••' : formatVnd(balance.usdc * price.vnd)}
-              </p>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/send')}
-            className="flex w-full items-center gap-3 rounded-2xl bg-[color:var(--surface)] p-3 text-left transition hover:bg-[color:var(--surface-strong)] active:scale-[0.99]"
-          >
-            <img
-              src={SOL_ICON}
-              alt="Solana"
-              className="h-10 w-10 rounded-full ring-2 ring-white/15"
-              loading="lazy"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-[13.5px] font-semibold">Solana</p>
-              <p className="text-[10.5px] text-[color:var(--muted)]">
-                {airdrop.status === 'pending' || airdrop.status === 'sending' ? (
-                  <span className="flex items-center gap-1 text-[#ffb020]">
-                    <Loader2 size={10} className="animate-spin" /> Đang chờ airdrop SOL
-                  </span>
-                ) : (
-                  'Phí gas · không có giá trị USD'
-                )}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-[14px] font-semibold tabular-nums">
-                {hidden ? '••••' : formatSolBalance(balance.sol)}
-              </p>
-              <p className="text-[10.5px] text-[color:var(--muted)]">—</p>
-            </div>
-          </button>
+          {ENABLED_COINS.map((c) => {
+            const isUsdc = c.id === 'usdc'
+            const isSol = c.id === 'sol'
+            const coinBalance = isUsdc ? balance.usdc : isSol ? balance.sol : 0
+            const coinBalanceStr = isUsdc
+              ? formatAmount(balance.usdc, 2)
+              : isSol
+                ? formatSolBalance(balance.sol)
+                : '0'
+            const subLine = isUsdc
+              ? (hidden ? '≈ ••••' : formatVnd(balance.usdc * price.vnd))
+              : isSol
+                ? (airdrop.status === 'pending' || airdrop.status === 'sending'
+                    ? 'Đang chờ airdrop…'
+                    : c.tagline)
+                : c.tagline
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => navigate(isUsdc ? '/receive' : '/send')}
+                className="flex w-full items-center gap-3 rounded-2xl bg-[color:var(--surface)] p-3 text-left transition hover:bg-[color:var(--surface-strong)] active:scale-[0.99]"
+              >
+                {c.icon}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13.5px] font-semibold">{c.name}</p>
+                  <p className="text-[10.5px] text-[color:var(--muted)]">
+                    {isSol && (airdrop.status === 'pending' || airdrop.status === 'sending') ? (
+                      <span className="flex items-center gap-1 text-[#ffb020]">
+                        <Loader2 size={10} className="animate-spin" /> Đang chờ airdrop SOL
+                      </span>
+                    ) : isUsdc ? (
+                      <span className="font-mono text-[10px] break-all">{shortAddress(USDC_MINT, 8)}</span>
+                    ) : (
+                      c.tagline
+                    )}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[14px] font-semibold tabular-nums">
+                    {hidden ? '••••' : coinBalanceStr}
+                  </p>
+                  <p className="text-[10.5px] text-[color:var(--muted)]">
+                    {c.hasUsdValue ? (hidden ? '≈ ••••' : formatVnd(coinBalance * price.vnd)) : '—'}
+                  </p>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
 
