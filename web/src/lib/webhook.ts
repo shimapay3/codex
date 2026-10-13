@@ -54,6 +54,7 @@ export function buildTxMessage(
   entry: TxEntry,
   walletName: string,
   walletAddress: string,
+  contactName?: string,
 ): string {
   const direction =
     entry.direction === 'in' ? '📥 Nhận' : entry.direction === 'out' ? '📤 Gửi' : '🔄 Giao dịch'
@@ -70,7 +71,10 @@ export function buildTxMessage(
     `<b>Số lượng:</b> 💠 ${formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} USDC`,
     `<b>Trạng thái:</b> ${status}`,
     entry.memo ? `<b>Memo:</b> ${entry.memo}` : '',
-    `<b>Đối tác:</b> <code>${counterparty}</code>`,
+    contactName
+      ? `👤 <b>Danh bạ:</b> <b>${contactName}</b>`
+      : `<b>Đối tác:</b> <code>${counterparty}</code>`,
+    `<b>Địa chỉ đối tác:</b> <code>${counterparty}</code>`,
     `<b>Thời gian:</b> ${time}`,
     `<b>Slot:</b> ${entry.slot}`,
     `<b>Chữ ký:</b> <code>${entry.signature}</code>`,

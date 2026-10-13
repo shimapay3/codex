@@ -233,7 +233,8 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
               if (!entry || !activeWallet) return
               setSendingWebhook(true)
               try {
-                const message = buildTxMessage(entry, activeWallet.name, activeWallet.address)
+                const contact = entry.counterparty ? contacts.find((c) => c.address === entry.counterparty) : null
+                const message = buildTxMessage(entry, activeWallet.name, activeWallet.address, contact?.name)
                 const result = await sendWebhook(prefs.webhookBotToken, prefs.webhookTopicUrl, message)
                 if (result.ok) {
                   markWebhookSent(entry.signature)
