@@ -55,7 +55,7 @@ Verify with `docker compose -f docker-compose.base44.yml ps` and `curl -s localh
   Security: one airdrop per address, max 3 requests per IP per hour, a daily cap
   (`AIRDROP_DAILY_LIMIT`, default 100), and the cron re-checks the recipient's balance before
   sending. The client polls `GET /api/airdrop/status/:address` and shows a toast when SOL arrives.
-- **USDC price** is fixed at 1 USD / 300,000 VND unless a price endpoint is configured in Settings
+- **USDC price** is fixed at 1 USD / 30,000 VND unless a price endpoint is configured in Settings
   (blank by default). A failing endpoint falls back to the fixed rate and flags `fallback: true`.
 - Icons are pre-rendered PNGs in `web/public/icons/` (iOS ignores SVG for `apple-touch-icon`). The
   source mark is `web/public/logo.svg`; regenerate with sharp if the mark changes.

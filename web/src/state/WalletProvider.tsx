@@ -193,7 +193,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [prefs, setPrefsState] = useState<Prefs>(loadPrefsMirror)
   const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null)
   const [pinEnabled, setPinEnabled] = useState<boolean>(() => !!loadPinWrap())
-  const [price, setPrice] = useState<PriceInfo>({ usd: 1, vnd: 300000, source: 'fixed' })
+  const [price, setPrice] = useState<PriceInfo>({ usd: 1, vnd: 30000, source: 'fixed' })
   const [balance, setBalance] = useState<BalanceState>({
     usdc: 0,
     sol: 0,
