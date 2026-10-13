@@ -1,6 +1,6 @@
 import { TxEntry, formatAmount } from './solana'
 import { readLocal, writeLocal } from './storage'
-import { fullDateTime } from './format'
+import { fullDateTime, formatVnd } from './format'
 
 const WEBHOOK_SENT_KEY = 'webhook-sent.v1'
 
@@ -68,7 +68,7 @@ export function buildTxMessage(
     `<b>Ví:</b> ${walletName}`,
     `<b>Địa chỉ:</b> <code>${walletAddress}</code>`,
     `<b>Loại:</b> ${direction}`,
-    `<b>Số lượng:</b> 💠 ${formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} USDC`,
+    `<b>Số lượng:</b> 💠 ${formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} USDC (≈ ${formatVnd(entry.amount * 30000)})`,
     `<b>Trạng thái:</b> ${status}`,
     entry.memo ? `<b>Memo:</b> ${entry.memo}` : '',
     contactName
