@@ -30,12 +30,13 @@ function AmountLine({ entry }: { entry: TxEntry }) {
 }
 
 export function TxRow({ entry, onSelect }: { entry: TxEntry; onSelect: (entry: TxEntry) => void }) {
-  const { txMeta } = useWallet()
+  const { txMeta, contacts } = useWallet()
   const meta = txMeta[entry.signature]
   const parsed = splitMemo(entry.memo)
   const category = parsed.category
   const color = meta?.category ? undefined : category.color
   const label = parsed.title || meta?.wish || category.label
+  const contact = entry.counterparty ? contacts.find((c) => c.address === entry.counterparty) : null
 
   return (
     <button
@@ -67,6 +68,11 @@ export function TxRow({ entry, onSelect }: { entry: TxEntry; onSelect: (entry: T
           <span className="truncate text-[13.5px] font-semibold">
             {entry.status === 'failed' ? 'Giao dịch thất bại' : label}
           </span>
+          {contact && (
+            <span className="shrink-0 rounded-full bg-[color:var(--accent)]/12 px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--accent)]">
+              {contact.name}
+            </span>
+          )}
         </span>
         {entry.memo && (
           <span className="mt-0.5 block truncate text-[11.5px] text-[color:var(--muted)]">{entry.memo}</span>
@@ -79,13 +85,14 @@ export function TxRow({ entry, onSelect }: { entry: TxEntry; onSelect: (entry: T
 }
 
 export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: () => void }) {
-  const { price, prefs } = useWallet()
+  const { price, prefs, contacts } = useWallet()
   const [copied, setCopied] = useState(false)
   if (!entry) return null
 
   const parsed = splitMemo(entry.memo)
   const totalUsd = formatUsd(entry.amount)
   const totalVnd = formatVnd(entry.amount * price.vnd)
+  const contact = entry.counterparty ? contacts.find((c) => c.address === entry.counterparty) : null
 
   return (
     <div className="fixed inset-0 z-[150] flex items-end justify-center sm:items-center">
@@ -158,8 +165,9 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
             { label: 'Slot', value: String(entry.slot) },
             {
               label: entry.direction === 'in' ? 'Từ' : 'Đến',
-              value: entry.counterparty || 'Không xác định',
+              value: contact ? contact.name : (entry.counterparty || 'Không xác định'),
             },
+            ...(contact && entry.counterparty ? [{ label: 'Địa chỉ', value: entry.counterparty }] : []),
             { label: 'Chữ ký', value: entry.signature },
           ].map((row) => (
             <div key={row.label} className="flex items-start justify-between gap-4 border-b border-[color:var(--border)] pb-2.5 last:border-0">
