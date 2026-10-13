@@ -15,18 +15,12 @@ import SecretUpload from './SecretUpload'
 import { useWallet } from '../state/WalletProvider'
 import { shortAddress } from '../lib/crypto'
 import { loadStore } from '../state/vault'
-import {
-  getTelegramDisplayName,
-  getTelegramUsername,
-  getTelegramUserIdString,
-  getTelegramPhotoUrl,
-  TELEGRAM_LOGO,
-} from '../lib/telegram'
+import { TELEGRAM_LOGO } from '../lib/telegram'
 
 type Mode = 'pin' | 'secret'
 
 export default function LockScreen() {
-  const { unlockWithPin, unlockWithSecret, pinEnabled, session, autoLockSeconds } = useWallet()
+  const { unlockWithPin, unlockWithSecret, pinEnabled, session, autoLockSeconds, telegramUser } = useWallet()
 
   const [mode, setMode] = useState<Mode>(pinEnabled ? 'pin' : 'secret')
   const [pin, setPin] = useState('')
@@ -34,13 +28,29 @@ export default function LockScreen() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showSecret, setShowSecret] = useState(false)
+  const [avatarKey, setAvatarKey] = useState(() => Date.now())
+
+  useEffect(() => {
+    const refresh = () => setAvatarKey(Date.now())
+    document.addEventListener('visibilitychange', refresh)
+    const timer = window.setInterval(refresh, 30000)
+    return () => {
+      document.removeEventListener('visibilitychange', refresh)
+      window.clearInterval(timer)
+    }
+  }, [])
 
   const index = useMemo(() => loadStore()?.index || [], [])
 
-  const tgName = getTelegramDisplayName()
-  const tgUsername = getTelegramUsername()
-  const tgId = getTelegramUserIdString()
-  const tgPhoto = getTelegramPhotoUrl()
+  const tgName = telegramUser
+    ? [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(' ') ||
+      (telegramUser.username ? `@${telegramUser.username}` : `User ${telegramUser.id}`)
+    : 'Khách'
+  const tgUsername = telegramUser?.username ? `@${telegramUser.username}` : null
+  const tgId = telegramUser ? String(telegramUser.id) : null
+  const tgPhoto = telegramUser?.photo_url
+    ? `${telegramUser.photo_url}${telegramUser.photo_url.includes('?') ? '&' : '?'}_=${avatarKey}`
+    : null
 
   useEffect(() => {
     setError(null)
