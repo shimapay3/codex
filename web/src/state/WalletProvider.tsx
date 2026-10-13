@@ -215,6 +215,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const seenRef = useRef<Set<string>>(new Set())
   const bootedRef = useRef(false)
   const lastAirdropStatusRef = useRef<AirdropState['status']>('idle')
+  const lastCloudUpdateRef = useRef<number | null>(null)
 
   const vaultRef = useRef<VaultData | null>(null)
   vaultRef.current = vault
@@ -313,6 +314,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         try {
           const cloud = await fetchUserCloudData(tgId)
           if (cloud) {
+            lastCloudUpdateRef.current = cloud.updatedAt ?? Date.now()
             let merged = data
             let changed = false
 
@@ -926,6 +928,84 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   })
 
   const realtimeConnected = session === 'unlocked' && !!activeAddress
+
+  // --- periodic cloud data sync (contacts, prefs) ---------------------------
+  // Cloud data (contacts, settings) is polled every 15 s so changes made on
+  // another device appear without restarting the app.  The initial sync runs
+  // 5 s after unlock; a visibility-change listener triggers an immediate
+  // refresh when the user returns to the app.
+  useEffect(() => {
+    if (session !== 'unlocked') return
+    const tgId = getTelegramUserIdString()
+    if (!tgId) return
+
+    let cancelled = false
+
+    const syncCloud = async () => {
+      if (cancelled) return
+      try {
+        const cloud = await fetchUserCloudData(tgId)
+        if (!cloud || cancelled) return
+
+        // Skip when cloud data hasn't changed since the last sync
+        if (cloud.updatedAt && lastCloudUpdateRef.current && cloud.updatedAt <= lastCloudUpdateRef.current) return
+        lastCloudUpdateRef.current = cloud.updatedAt
+
+        const current = vaultRef.current
+        if (!current) return
+
+        let merged = current
+        let changed = false
+
+        // Merge contacts — add cloud contacts not present locally
+        if (cloud.contacts.length > 0) {
+          const localByAddr = new Map(current.contacts.map((c) => [c.address, c]))
+          const newContacts = cloud.contacts.filter((c) => !localByAddr.has(c.address))
+          if (newContacts.length > 0) {
+            merged = { ...merged, contacts: [...merged.contacts, ...newContacts] }
+            changed = true
+          }
+        }
+
+        // Merge prefs — apply cloud prefs when any value differs from local
+        if (cloud.prefs && typeof cloud.prefs === 'object') {
+          const cloudPref = cloud.prefs as Partial<Prefs>
+          const prefChanged = (Object.keys(cloudPref) as (keyof Prefs)[]).some(
+            (key) => cloudPref[key] !== merged.prefs[key],
+          )
+          if (prefChanged) {
+            merged = { ...merged, prefs: { ...merged.prefs, ...cloudPref } }
+            setPrefsState((present) => ({ ...present, ...merged.prefs }))
+            changed = true
+          }
+        }
+
+        if (changed && !cancelled) {
+          setVault(merged)
+          vaultRef.current = merged
+          const key = vaultKeyRef.current
+          if (key) {
+            const envelope = await encryptVaultData(key, merged)
+            const existing = loadStore()
+            if (existing) saveStore({ ...existing, envelope })
+          }
+        }
+      } catch {
+        /* non-fatal */
+      }
+    }
+
+    const initialTimer = window.setTimeout(syncCloud, 5000)
+    const intervalTimer = window.setInterval(syncCloud, 15000)
+    document.addEventListener('visibilitychange', syncCloud)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(initialTimer)
+      window.clearInterval(intervalTimer)
+      document.removeEventListener('visibilitychange', syncCloud)
+    }
+  }, [session])
 
   // --- auto-balance SOL across wallets (Telegram only) ---------------------
   useEffect(() => {

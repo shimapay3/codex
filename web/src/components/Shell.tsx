@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { BookUser, Moon, Palette, Sparkles, Sun, TimerReset, X } from 'lucide-react'
 import { useWallet } from '../state/WalletProvider'
@@ -17,11 +17,7 @@ import SettingsPage from '../pages/SettingsPage'
 import ExplorerPage from '../pages/ExplorerPage'
 import { splitMemo } from '../lib/categories'
 import { formatAmount } from '../lib/solana'
-import {
-  getTelegramDisplayName,
-  getTelegramPhotoUrl,
-  TELEGRAM_LOGO,
-} from '../lib/telegram'
+import { TELEGRAM_LOGO } from '../lib/telegram'
 
 function AutoLockBanner() {
   const { autoLockSeconds, extendAutoLock, prefs } = useWallet()
@@ -98,11 +94,28 @@ function IncomingBanner() {
 }
 
 export default function Shell() {
-  const { prefs, setPrefs, balance } = useWallet()
+  const { prefs, setPrefs, balance, telegramUser } = useWallet()
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [themeOpen, setThemeOpen] = useState(false)
-  const tgName = getTelegramDisplayName()
-  const tgPhoto = getTelegramPhotoUrl()
+  const [avatarKey, setAvatarKey] = useState(() => Date.now())
+
+  useEffect(() => {
+    const refresh = () => setAvatarKey(Date.now())
+    document.addEventListener('visibilitychange', refresh)
+    const timer = window.setInterval(refresh, 30000)
+    return () => {
+      document.removeEventListener('visibilitychange', refresh)
+      window.clearInterval(timer)
+    }
+  }, [])
+
+  const tgName = telegramUser
+    ? [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(' ') ||
+      (telegramUser.username ? `@${telegramUser.username}` : `User ${telegramUser.id}`)
+    : 'Khách'
+  const tgPhoto = telegramUser?.photo_url
+    ? `${telegramUser.photo_url}${telegramUser.photo_url.includes('?') ? '&' : '?'}_=${avatarKey}`
+    : null
 
   return (
     <>
