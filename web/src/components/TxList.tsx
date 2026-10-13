@@ -118,7 +118,7 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
 
   return (
     <div className="fixed inset-0 z-[150] flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 modal-overlay-blur" onClick={onClose} aria-hidden />
       <div
         className="relative z-10 max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-[28px] glass-strong p-5 shadow-card sm:rounded-[28px]"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom,0px) + 1.25rem)' }}

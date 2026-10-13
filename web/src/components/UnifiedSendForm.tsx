@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BookUser,
   CheckCircle2,
+  Contact as ContactIcon,
   ExternalLink,
   Loader2,
   Plus,
@@ -20,6 +21,7 @@ import { copyToClipboard, formatUsd, formatVnd } from '../lib/format'
 import { CoinConfig } from '../lib/coins'
 import SendConfirm from './SendConfirm'
 import QrScanner from './QrScanner'
+import ContactPicker from './ContactPicker'
 
 type Props = { coin: CoinConfig }
 
@@ -52,9 +54,11 @@ export default function UnifiedSendForm({ coin }: Props) {
   const [maxPending, setMaxPending] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [showQr, setShowQr] = useState(false)
+  const [showContactPicker, setShowContactPicker] = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
   const [contactName, setContactName] = useState('')
   const [contactNote, setContactNote] = useState('')
+  const [showSaveAfterQr, setShowSaveAfterQr] = useState(false)
 
   const isUsdc = coin.id === 'usdc'
   const isSol = coin.id === 'sol'
@@ -105,6 +109,7 @@ export default function UnifiedSendForm({ coin }: Props) {
     setSignature(null)
     setError(null)
     setShowAddContact(false)
+    setShowSaveAfterQr(false)
     setContactName('')
     setContactNote('')
   }
@@ -380,28 +385,64 @@ export default function UnifiedSendForm({ coin }: Props) {
 
         {contacts.length > 0 && (
           <div className="mt-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--muted)]">
-              Danh bạ
+            <button
+              type="button"
+              onClick={() => setShowContactPicker(true)}
+              className="flex w-full items-center justify-between rounded-2xl border border-[color:var(--border)] px-4 py-3 text-left transition hover:bg-[color:var(--surface)]"
+            >
+              <span className="flex items-center gap-2 text-[12.5px] font-semibold text-[color:var(--muted)]">
+                <ContactIcon size={15} /> Chọn từ danh bạ
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px] text-[color:var(--muted)]">
+                {contacts.length} liên hệ
+                <ArrowRight size={14} />
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* Save-to-contacts prompt after QR scan */}
+        {showSaveAfterQr && !recipientInContacts && isValidAddress(to.trim()) && (
+          <div className="mt-3 space-y-2.5 rounded-2xl border border-[color:var(--accent)]/30 bg-[color:var(--surface)] p-4">
+            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-[color:var(--accent)]">
+              <UserPlus size={14} /> Lưu địa chỉ vào danh bạ?
             </p>
-            <div className="flex gap-2 overflow-x-auto no-scrollbar">
-              {contacts.slice(0, 12).map((contact) => (
-                <button
-                  key={contact.id}
-                  type="button"
-                  onClick={() => setTo(contact.address)}
-                  className={[
-                    'flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2 text-[12px] transition',
-                    to === contact.address
-                      ? 'border-transparent accent-gradient text-white'
-                      : 'border-[color:var(--border)]',
-                  ].join(' ')}
-                >
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[color:var(--surface-strong)] text-[10px] font-semibold">
-                    {contact.name.slice(0, 1).toUpperCase()}
-                  </span>
-                  {contact.name}
-                </button>
-              ))}
+            <input
+              value={contactName}
+              onChange={(e) => setContactName(e.target.value)}
+              placeholder="Tên gợi nhớ (VD: Minh, Shop Hoa…)"
+              className="w-full rounded-2xl border border-[color:var(--border)] bg-[color:var(--bg)] px-4 py-3 text-[13px] outline-none focus:border-[color:var(--accent)]"
+            />
+            <input
+              value={contactNote}
+              onChange={(e) => setContactNote(e.target.value)}
+              placeholder="Ghi chú (tuỳ chọn)"
+              className="w-full rounded-2xl border border-[color:var(--border)] bg-[color:var(--bg)] px-4 py-3 text-[12.5px] outline-none focus:border-[color:var(--accent)]"
+            />
+            <p className="truncate font-mono text-[10.5px] text-[color:var(--muted)]">{shortAddress(to.trim(), 8)}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSaveAfterQr(false)
+                  setContactName('')
+                  setContactNote('')
+                }}
+                className="rounded-2xl border border-[color:var(--border)] py-3 text-[12.5px] font-semibold"
+              >
+                Bỏ qua
+              </button>
+              <button
+                type="button"
+                disabled={!contactName.trim()}
+                onClick={async () => {
+                  await handleAddContact()
+                  setShowSaveAfterQr(false)
+                }}
+                className="rounded-2xl accent-gradient py-3 text-[12.5px] font-semibold text-white disabled:opacity-45"
+              >
+                Lưu
+              </button>
             </div>
           </div>
         )}
@@ -590,7 +631,7 @@ export default function UnifiedSendForm({ coin }: Props) {
 
       {maxPending && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
+          className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-5"
           onClick={() => setMaxPending(false)}
         >
           <div
@@ -631,9 +672,26 @@ export default function UnifiedSendForm({ coin }: Props) {
           onScan={(address) => {
             setTo(address)
             setShowQr(false)
+            // Show save-to-contacts prompt if address is not already in contacts
+            const exists = contacts.some((c) => c.address === address.trim())
+            if (!exists) {
+              setShowSaveAfterQr(true)
+            }
             pushToast({ tone: 'success', title: 'Đã quét QR', body: shortAddress(address, 6) })
           }}
           onClose={() => setShowQr(false)}
+        />
+      )}
+
+      {showContactPicker && (
+        <ContactPicker
+          contacts={contacts}
+          selectedAddress={to}
+          onSelect={(address) => {
+            setTo(address)
+            pushToast({ tone: 'info', title: 'Đã chọn danh bạ' })
+          }}
+          onClose={() => setShowContactPicker(false)}
         />
       )}
     </div>

@@ -20,7 +20,7 @@ export default function ThemePopup({ open, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 modal-overlay-blur" onClick={onClose} aria-hidden />
       <div className="relative z-10 w-full max-w-md rounded-t-[28px] glass-strong p-5 shadow-card sm:rounded-[28px]"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom,0px) + 1.25rem)' }}>
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/25 sm:hidden" />

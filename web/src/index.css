@@ -13,6 +13,8 @@
   --text: #f4f6ff;
   --muted: rgba(226, 232, 255, 0.62);
   --star: rgba(255, 255, 255, 0.72);
+  --overlay: rgba(0, 0, 0, 0.5);
+  --overlay-blur: rgba(0, 0, 0, 0.6);
   color-scheme: dark;
 }
 
@@ -25,6 +27,8 @@ html.light {
   --text: #10142c;
   --muted: rgba(24, 30, 60, 0.62);
   --star: rgba(20, 24, 60, 0.55);
+  --overlay: rgba(15, 18, 40, 0.2);
+  --overlay-blur: rgba(15, 18, 40, 0.22);
   color-scheme: light;
 }
 
@@ -89,6 +93,16 @@ body {
   border: 1px solid var(--border);
   backdrop-filter: blur(22px) saturate(160%);
   -webkit-backdrop-filter: blur(22px) saturate(160%);
+}
+
+.modal-overlay {
+  background: var(--overlay);
+}
+
+.modal-overlay-blur {
+  background: var(--overlay-blur);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .accent-gradient {

@@ -39,14 +39,22 @@ export default function QrScanner({ onScan, onClose }: Props) {
           return
         }
         streamRef.current = stream
+        // Set status to scanning FIRST so the video element is visible,
+        // then attach the stream. The video element is always rendered
+        // in the DOM (see JSX below), so the ref is always available.
+        setStatus('scanning')
         const video = videoRef.current
         if (video) {
           video.srcObject = stream
           video.setAttribute('playsinline', 'true')
-          await video.play()
-          setStatus('scanning')
-          tick()
+          // Wait for the video to be ready before playing
+          video.onloadedmetadata = () => {
+            video.play().catch(() => {})
+          }
+          // Fallback: try play directly in case onloadedmetadata already fired
+          video.play().catch(() => {})
         }
+        tick()
       } catch (err: any) {
         if (cancelled) return
         if (err?.name === 'NotAllowedError') {
@@ -69,6 +77,10 @@ export default function QrScanner({ onScan, onClose }: Props) {
       }
       const w = video.videoWidth
       const h = video.videoHeight
+      if (!w || !h) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
       canvas.width = w
       canvas.height = h
       const ctx = canvas.getContext('2d', { willReadFrequently: true })
@@ -128,7 +140,7 @@ export default function QrScanner({ onScan, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4">
       <div className="relative w-full max-w-sm overflow-hidden rounded-[28px] glass-strong p-5 shadow-card">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-[15px] font-semibold">Quét mã QR</h3>
@@ -171,21 +183,22 @@ export default function QrScanner({ onScan, onClose }: Props) {
         {mode === 'camera' && (
           <div className="relative">
             <div className="relative aspect-square overflow-hidden rounded-2xl bg-black">
-              {status === 'scanning' && (
-                <video
-                  ref={videoRef}
-                  playsInline
-                  muted
-                  className="h-full w-full object-cover"
-                />
-              )}
+              {/* Video is ALWAYS rendered so the ref is available immediately */}
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                autoPlay
+                className="h-full w-full object-cover"
+              />
+              {/* Loading overlay on top of video */}
               {status === 'starting' && (
-                <div className="flex h-full items-center justify-center">
-                  <Loader2 size={28} className="animate-spin text-[color:var(--muted)]" />
+                <div className="absolute inset-0 flex items-center justify-center bg-black">
+                  <Loader2 size={28} className="animate-spin text-white/70" />
                 </div>
               )}
               {(status === 'no-camera' || status === 'error') && (
-                <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
+                <div className="absolute inset-0 flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
                   <Camera size={32} className="text-[color:var(--muted)]" />
                   <p className="text-[12px] text-[color:var(--muted)]">{errorMsg}</p>
                   <button
