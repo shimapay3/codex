@@ -10,11 +10,12 @@ import { useWallet } from '../state/WalletProvider'
 import { isValidAddress, shortAddress } from '../lib/crypto'
 import { formatSolBalance, SOL_ICON } from '../lib/solana'
 import { copyToClipboard } from '../lib/format'
+import SendConfirm from './SendConfirm'
 
 const QUICK = [0.01, 0.05, 0.1, 0.5, 1]
 
 export default function SolSendForm() {
-  const { sendSol, balance, contacts, wallets, activeWallet, pushToast } = useWallet()
+  const { sendSol, balance, contacts, wallets, activeWallet, pushToast, verifyPin, pinEnabled } = useWallet()
 
   const [to, setTo] = useState('')
   const [amountText, setAmountText] = useState('')
@@ -24,6 +25,7 @@ export default function SolSendForm() {
   const [error, setError] = useState<string | null>(null)
   const [signature, setSignature] = useState<string | null>(null)
   const [maxPending, setMaxPending] = useState(false)
+  const [confirming, setConfirming] = useState(false)
 
   const amount = Number.parseFloat(amountText.replace(/,/g, '.')) || 0
   const validTo = isValidAddress(to) && to.trim() !== activeWallet?.address
@@ -294,7 +296,7 @@ export default function SolSendForm() {
           <button
             type="button"
             disabled={busy}
-            onClick={doSend}
+            onClick={() => setConfirming(true)}
             className="flex w-full items-center justify-center gap-2 rounded-2xl accent-gradient py-4 text-[15px] font-semibold text-white shadow-glow disabled:opacity-60"
           >
             {busy ? <Loader2 size={17} className="animate-spin" /> : <SendIcon size={17} />}
@@ -321,6 +323,18 @@ export default function SolSendForm() {
           <AlertTriangle size={15} className="mt-0.5 shrink-0" />
           <span className="leading-relaxed">{error}</span>
         </div>
+      )}
+
+      {confirming && (
+        <SendConfirm
+          onConfirm={() => {
+            setConfirming(false)
+            doSend()
+          }}
+          onCancel={() => setConfirming(false)}
+          pinEnabled={pinEnabled}
+          verifyPin={verifyPin}
+        />
       )}
 
       {maxPending && (

@@ -15,6 +15,7 @@ import { isValidAddress, shortAddress } from '../lib/crypto'
 import { USDC_MINT, formatAmount, parseAmountInput } from '../lib/solana'
 import { copyToClipboard, formatUsd, formatVnd } from '../lib/format'
 import UsdcAvatar from './UsdcAvatar'
+import SendConfirm from './SendConfirm'
 
 const QUICK = [1, 5, 10, 25, 50]
 
@@ -29,6 +30,8 @@ export default function SendForm() {
     pushToast,
     prefs,
     airdrop,
+    verifyPin,
+    pinEnabled,
   } = useWallet()
 
   const [to, setTo] = useState('')
@@ -41,6 +44,7 @@ export default function SendForm() {
   const [error, setError] = useState<string | null>(null)
   const [signature, setSignature] = useState<string | null>(null)
   const [maxPending, setMaxPending] = useState(false)
+  const [confirming, setConfirming] = useState(false)
 
   const maxAmount = Math.floor(balance.usdc * 1e6) / 1e6
   const amount = parseAmountInput(amountText, balance.decimals || 6)
@@ -386,7 +390,7 @@ export default function SendForm() {
           <button
             type="button"
             disabled={busy}
-            onClick={doSend}
+            onClick={() => setConfirming(true)}
             className="flex w-full items-center justify-center gap-2 rounded-2xl accent-gradient py-4 text-[15px] font-semibold text-white shadow-glow disabled:opacity-60"
           >
             {busy ? <Loader2 size={17} className="animate-spin" /> : <SendIcon size={17} />}
@@ -419,6 +423,18 @@ export default function SendForm() {
         Token duy nhất: USDC (Cloud Chain) · {prefs.rpcUrl.replace(/^https?:\/\//, '')}
       </p>
       <p className="px-1 font-mono text-[9.5px] break-all text-[color:var(--muted)]">{USDC_MINT}</p>
+
+      {confirming && (
+        <SendConfirm
+          onConfirm={() => {
+            setConfirming(false)
+            doSend()
+          }}
+          onCancel={() => setConfirming(false)}
+          pinEnabled={pinEnabled}
+          verifyPin={verifyPin}
+        />
+      )}
 
       {maxPending && (
         <div

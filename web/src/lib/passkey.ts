@@ -1,4 +1,5 @@
 import { b64ToBytes, bytesToB64 } from './crypto'
+import { readLocal, writeLocal, StorageKeys } from './storage'
 
 /**
  * Passkey (WebAuthn) helpers.
@@ -159,4 +160,34 @@ export async function verifyPrf(record: PasskeyRecord, prfBytes: Uint8Array): Pr
 export function describePasskeySupport(record: PasskeyRecord | null): string {
   if (!record) return 'Chưa thiết lập'
   return record.prf ? 'Passkey + PRF (khoá phần cứng)' : 'Passkey (không hỗ trợ PRF)'
+}
+
+/**
+ * Confirm a sensitive action (e.g. sending tokens) using the device's
+ * platform authenticator.  If a PasskeyRecord is already stored we assert it;
+ * otherwise we register one on the fly (the registration gesture itself
+ * verifies the user).  Returns false on any failure or user cancellation —
+ * the caller should then fall back to PIN.
+ */
+export async function confirmWithPasskey(): Promise<boolean> {
+  if (!passkeysSupported()) return false
+  if (!(await platformAuthenticatorAvailable())) return false
+
+  const stored = readLocal<PasskeyRecord | null>(StorageKeys.passkey, null)
+  if (stored) {
+    try {
+      await assertPasskey(stored)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  try {
+    const { record } = await registerPasskey('XPay Send')
+    writeLocal(StorageKeys.passkey, record)
+    return true
+  } catch {
+    return false
+  }
 }

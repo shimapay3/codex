@@ -149,6 +149,7 @@ type WalletContextValue = {
   }) => Promise<string>
   sendSol: (params: { to: string; amount: number; memo?: string }) => Promise<string>
   unlockWithPin: (pin: string) => Promise<void>
+  verifyPin: (pin: string) => Promise<void>
   unlockWithSecret: (input: string) => Promise<void>
   setPin: (pin: string) => Promise<void>
   clearPin: () => Promise<void>
@@ -413,6 +414,30 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [unlockWithData],
+  )
+
+  const verifyPin = useCallback(
+    async (pin: string) => {
+      const lockoutMs = getPinLockoutRemaining()
+      if (lockoutMs > 0) {
+        const seconds = Math.ceil(lockoutMs / 1000)
+        throw new Error(`PIN bị khoá, thử lại sau ${seconds} giây`)
+      }
+      const wrap = loadPinWrap()
+      if (!wrap) throw new Error('Chưa thiết lập mã PIN')
+      try {
+        await openPinWrap(pin, wrap)
+        resetPinAttempts()
+      } catch {
+        const result = recordPinFailure()
+        if (result.locked) {
+          const seconds = Math.ceil(result.remainingMs / 1000)
+          throw new Error(`Mã PIN không đúng. PIN bị khoá ${seconds} giây.`)
+        }
+        throw new Error('Mã PIN không đúng')
+      }
+    },
+    [],
   )
 
   const unlockWithSecret = useCallback(
@@ -1266,6 +1291,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     send,
     sendSol,
     unlockWithPin,
+    verifyPin,
     unlockWithSecret,
     setPin,
     clearPin,
