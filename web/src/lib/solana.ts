@@ -743,11 +743,11 @@ export async function fetchPrice(endpoint?: string): Promise<PriceInfo> {
     const json = await res.json()
     return {
       usd: Number(json.usd) || 1,
-      vnd: Number(json.vnd) || 30000,
+      vnd: Number(json.vnd) || 300000,
       source: json.source || 'fixed',
       fallback: !!json.fallback,
     }
   } catch {
-    return { usd: 1, vnd: 30000, source: 'fixed' }
+    return { usd: 1, vnd: 300000, source: 'fixed' }
   }
 }

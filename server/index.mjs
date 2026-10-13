@@ -12,7 +12,7 @@ const PORT = Number(process.env.PORT || 8000)
 // PRICE_ENDPOINT env var or at runtime from the app's Settings screen, where the
 // user may point it at any RPC/price endpoint that returns JSON.
 const FIXED_USD = 1
-const FIXED_VND = 30000
+const FIXED_VND = 300000
 const PRICE_ENDPOINT = (process.env.PRICE_ENDPOINT || '').trim()
 
 const app = express()
