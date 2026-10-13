@@ -62,12 +62,12 @@ export function buildTxMessage(
   const counterparty = entry.counterparty || 'Không xác định'
 
   return [
-    '🔔 <b>Giao dịch USDC</b>',
+    '🔔 <b>Giao dịch 💠 USDC</b>',
     '',
     `<b>Ví:</b> ${walletName}`,
     `<b>Địa chỉ:</b> <code>${walletAddress}</code>`,
     `<b>Loại:</b> ${direction}`,
-    `<b>Số lượng:</b> ${formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} USDC`,
+    `<b>Số lượng:</b> 💠 ${formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} USDC`,
     `<b>Trạng thái:</b> ${status}`,
     entry.memo ? `<b>Memo:</b> ${entry.memo}` : '',
     `<b>Đối tác:</b> <code>${counterparty}</code>`,
@@ -114,11 +114,11 @@ export async function sendTestWebhook(
   topicUrl: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const text = [
-    '🧪 <b>Test Webhook</b>',
+    '🧪 <b>Test Webhook</b> 💠',
     '',
     'XPay Wallet · Cloud Chain',
     `Thời gian: ${fullDateTime(Math.floor(Date.now() / 1000))}`,
-    'Webhook hoạt động bình thường ✅',
+    '✅ Webhook hoạt động bình thường',
   ].join('\n')
   return sendWebhook(botToken, topicUrl, text)
 }
