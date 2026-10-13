@@ -272,7 +272,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const next = { ...current, ...patch }
       // Push prefs to cloud when inside Telegram so settings survive restarts
       const tgId = getTelegramUserIdString()
-      if (tgId) void pushUserCloudData(tgId, { prefs: next })
+      if (tgId) {
+        lastCloudUpdateRef.current = Date.now()
+        void pushUserCloudData(tgId, { prefs: next })
+      }
       return next
     })
   }, [])
@@ -722,7 +725,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       await persist({ ...current, contacts })
       // Push to cloud when inside Telegram
       const tgId = getTelegramUserIdString()
-      if (tgId) void pushUserCloudData(tgId, { contacts })
+      if (tgId) {
+        lastCloudUpdateRef.current = Date.now()
+        void pushUserCloudData(tgId, { contacts })
+      }
     },
     [persist],
   )
@@ -957,12 +963,21 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         let merged = current
         let changed = false
 
-        // Merge contacts — add cloud contacts not present locally
-        if (cloud.contacts.length > 0) {
+        // Contacts: cloud is source of truth — replace local with cloud when different
+        if (cloud.contacts.length > 0 || current.contacts.length > 0) {
           const localByAddr = new Map(current.contacts.map((c) => [c.address, c]))
-          const newContacts = cloud.contacts.filter((c) => !localByAddr.has(c.address))
-          if (newContacts.length > 0) {
-            merged = { ...merged, contacts: [...merged.contacts, ...newContacts] }
+          let contactsChanged = current.contacts.length !== cloud.contacts.length
+          if (!contactsChanged) {
+            for (const cc of cloud.contacts) {
+              const lc = localByAddr.get(cc.address)
+              if (!lc || lc.name !== cc.name || (lc.note || '') !== (cc.note || '') || !!lc.favorite !== !!cc.favorite) {
+                contactsChanged = true
+                break
+              }
+            }
+          }
+          if (contactsChanged) {
+            merged = { ...merged, contacts: cloud.contacts }
             changed = true
           }
         }
