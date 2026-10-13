@@ -180,7 +180,21 @@ async function fetchRecentTxs(rpcUrl, owner, limit = 15) {
       // Fallback to owner address if ATA resolution fails
     }
 
-    const signatures = await rpcMethod(rpcUrl, 'getSignaturesForAddress', [queryAddress, { limit }])
+    let signatures = await rpcMethod(rpcUrl, 'getSignaturesForAddress', [queryAddress, { limit }])
+
+    // Fallback: if ATA query returns nothing, try the owner's system account.
+    // Some RPC nodes don't index Token-2022 activity by the ATA address.
+    if ((!Array.isArray(signatures) || signatures.length === 0) && queryAddress !== owner) {
+      try {
+        const ownerSigs = await rpcMethod(rpcUrl, 'getSignaturesForAddress', [owner, { limit }])
+        if (Array.isArray(ownerSigs) && ownerSigs.length > 0) {
+          signatures = ownerSigs
+        }
+      } catch {
+        /* keep empty result */
+      }
+    }
+
     if (!Array.isArray(signatures) || signatures.length === 0) return []
 
     const entries = await Promise.all(

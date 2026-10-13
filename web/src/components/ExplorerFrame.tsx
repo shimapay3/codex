@@ -355,7 +355,10 @@ function AddressView({ result }: { result: AddressResult }) {
             Số dư SOL
           </p>
           <p className="mt-1 text-[18px] font-bold tabular-nums">
-            {result.sol.toFixed(6)} <span className="text-[12px] text-[color:var(--muted)]">SOL</span>
+            {result.sol >= 1000
+              ? result.sol.toLocaleString('en-US', { maximumFractionDigits: 2 })
+              : result.sol.toFixed(4)}{' '}
+            <span className="text-[12px] text-[color:var(--muted)]">SOL</span>
           </p>
         </div>
         <div className="rounded-2xl bg-[color:var(--surface)] p-3">

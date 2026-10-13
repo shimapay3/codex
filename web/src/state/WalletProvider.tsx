@@ -246,6 +246,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setTelegramUser(getTelegramUser())
   }, [])
 
+  // --- refresh Telegram user info (avatar, name, username) -----------------
+  // Telegram profile data can change between sessions. Refresh on visibility
+  // change and every 30s while the app is open so the header always shows the
+  // latest avatar/name/username.
+  useEffect(() => {
+    const refreshTg = () => setTelegramUser(getTelegramUser())
+    document.addEventListener('visibilitychange', refreshTg)
+    const timer = window.setInterval(refreshTg, 30000)
+    return () => {
+      document.removeEventListener('visibilitychange', refreshTg)
+      window.clearInterval(timer)
+    }
+  }, [])
+
   // --- theme ----------------------------------------------------------------
   useEffect(() => {
     applyTheme(prefs.mode, prefs.accentId, prefs.accentColor || undefined)
@@ -253,7 +267,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [prefs])
 
   const setPrefs = useCallback((patch: Partial<Prefs>) => {
-    setPrefsState((current) => ({ ...current, ...patch }))
+    setPrefsState((current) => {
+      const next = { ...current, ...patch }
+      // Push prefs to cloud when inside Telegram so settings survive restarts
+      const tgId = getTelegramUserIdString()
+      if (tgId) void pushUserCloudData(tgId, { prefs: next })
+      return next
+    })
   }, [])
 
   // --- vault persistence ----------------------------------------------------
@@ -323,19 +343,32 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
               }
             }
 
+            // Merge prefs — cloud prefs override local when cloud is newer
+            if (cloud.prefs && typeof cloud.prefs === 'object') {
+              const cloudPrefs = cloud.prefs as Partial<Prefs>
+              merged = { ...merged, prefs: { ...merged.prefs, ...cloudPrefs } }
+              setPrefsState((present) => ({ ...present, ...merged.prefs }))
+              changed = true
+            }
+
             if (changed) {
               setVault(merged)
               vaultRef.current = merged
               const envelope = await encryptVaultData(vaultKey, merged)
               const existing = loadStore()
               if (existing) saveStore({ ...existing, envelope })
-              // Push merged contacts back to cloud
-              void pushUserCloudData(tgId, { contacts: merged.contacts, samples: merged.samples })
+              // Push merged data back to cloud
+              void pushUserCloudData(tgId, { contacts: merged.contacts, samples: merged.samples, prefs: merged.prefs })
             }
 
-            // Push current contacts to cloud if cloud was empty
+            // Push current data to cloud if cloud was empty
             if (cloud.contacts.length === 0 && data.contacts.length > 0) {
-              void pushUserCloudData(tgId, { contacts: data.contacts, samples: data.samples })
+              void pushUserCloudData(tgId, { contacts: data.contacts, samples: data.samples, prefs: data.prefs })
+            }
+
+            // Always push prefs to cloud if cloud had none
+            if (!cloud.prefs) {
+              void pushUserCloudData(tgId, { prefs: data.prefs })
             }
           }
         } catch {
