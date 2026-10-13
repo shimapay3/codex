@@ -18,13 +18,8 @@ import Logo from './Logo'
 import SecretUpload from './SecretUpload'
 import { useWallet } from '../state/WalletProvider'
 import { USDC_AVATAR, USDC_MINT, MAX_WALLETS, getSolBalance, DEFAULT_RPC_URL } from '../lib/solana'
-import {
-  getTelegramDisplayName,
-  getTelegramUsername,
-  getTelegramUserIdString,
-  getTelegramPhotoUrl,
-  TELEGRAM_LOGO,
-} from '../lib/telegram'
+import { TELEGRAM_LOGO } from '../lib/telegram'
+import { useTelegramProfile } from '../state/useTelegramProfile'
 import { copyToClipboard, downloadTextFile } from '../lib/format'
 import { shortAddress } from '../lib/crypto'
 
@@ -44,10 +39,7 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
   const [showSecret, setShowSecret] = useState(false)
   const [showPin, setShowPin] = useState(false)
 
-  const tgName = getTelegramDisplayName()
-  const tgUsername = getTelegramUsername()
-  const tgId = getTelegramUserIdString()
-  const tgPhoto = getTelegramPhotoUrl()
+  const { name: tgName, username: tgUsername, id: tgId, photo: tgPhoto } = useTelegramProfile()
 
   const run = async (task: () => Promise<unknown>) => {
     setBusy(true)

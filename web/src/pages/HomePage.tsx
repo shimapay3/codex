@@ -20,13 +20,8 @@ import UsdcAvatar from '../components/UsdcAvatar'
 import BalanceChart from '../components/BalanceChart'
 import TxList, { TxDetail } from '../components/TxList'
 import { USDC_MINT } from '../lib/solana'
-import {
-  getTelegramDisplayName,
-  getTelegramUsername,
-  getTelegramUserIdString,
-  getTelegramPhotoUrl,
-  TELEGRAM_LOGO,
-} from '../lib/telegram'
+import { TELEGRAM_LOGO } from '../lib/telegram'
+import { useTelegramProfile } from '../state/useTelegramProfile'
 import { copyToClipboard } from '../lib/format'
 
 export default function HomePage() {
@@ -48,10 +43,7 @@ export default function HomePage() {
   const navigate = useNavigate()
 
   const hidden = prefs.hideBalances
-  const tgName = getTelegramDisplayName()
-  const tgUsername = getTelegramUsername()
-  const tgId = getTelegramUserIdString()
-  const tgPhoto = getTelegramPhotoUrl()
+  const { name: tgName, id: tgId, photo: tgPhoto } = useTelegramProfile()
 
   const handleRefresh = async () => {
     setRefreshing(true)

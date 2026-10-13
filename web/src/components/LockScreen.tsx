@@ -16,11 +16,12 @@ import { useWallet } from '../state/WalletProvider'
 import { shortAddress } from '../lib/crypto'
 import { loadStore } from '../state/vault'
 import { TELEGRAM_LOGO } from '../lib/telegram'
+import { useTelegramProfile } from '../state/useTelegramProfile'
 
 type Mode = 'pin' | 'secret'
 
 export default function LockScreen() {
-  const { unlockWithPin, unlockWithSecret, pinEnabled, session, autoLockSeconds, telegramUser } = useWallet()
+  const { unlockWithPin, unlockWithSecret, pinEnabled, session, autoLockSeconds } = useWallet()
 
   const [mode, setMode] = useState<Mode>(pinEnabled ? 'pin' : 'secret')
   const [pin, setPin] = useState('')
@@ -28,29 +29,9 @@ export default function LockScreen() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showSecret, setShowSecret] = useState(false)
-  const [avatarKey, setAvatarKey] = useState(() => Date.now())
-
-  useEffect(() => {
-    const refresh = () => setAvatarKey(Date.now())
-    document.addEventListener('visibilitychange', refresh)
-    const timer = window.setInterval(refresh, 30000)
-    return () => {
-      document.removeEventListener('visibilitychange', refresh)
-      window.clearInterval(timer)
-    }
-  }, [])
-
   const index = useMemo(() => loadStore()?.index || [], [])
 
-  const tgName = telegramUser
-    ? [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(' ') ||
-      (telegramUser.username ? `@${telegramUser.username}` : `User ${telegramUser.id}`)
-    : 'Khách'
-  const tgUsername = telegramUser?.username ? `@${telegramUser.username}` : null
-  const tgId = telegramUser ? String(telegramUser.id) : null
-  const tgPhoto = telegramUser?.photo_url
-    ? `${telegramUser.photo_url}${telegramUser.photo_url.includes('?') ? '&' : '?'}_=${avatarKey}`
-    : null
+  const { name: tgName, username: tgUsername, id: tgId, photo: tgPhoto } = useTelegramProfile()
 
   useEffect(() => {
     setError(null)

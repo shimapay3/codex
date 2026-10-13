@@ -25,14 +25,8 @@ import { copyToClipboard, downloadTextFile, formatVnd } from '../lib/format'
 import { notificationsSupported, primeAudio, requestNotificationPermission, ringIncoming } from '../lib/notify'
 import { shortAddress } from '../lib/crypto'
 import { removeLocal } from '../lib/storage'
-import {
-  getTelegramDisplayName,
-  getTelegramUsername,
-  getTelegramUserIdString,
-  getTelegramPhotoUrl,
-  isTelegramWebApp,
-  TELEGRAM_LOGO,
-} from '../lib/telegram'
+import { isTelegramWebApp, TELEGRAM_LOGO } from '../lib/telegram'
+import { useTelegramProfile } from '../state/useTelegramProfile'
 
 const LOCK_OPTIONS = [5, 10, 15, 20]
 
@@ -108,10 +102,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
     pushToast: toast,
   } = useWallet()
 
-  const tgName = getTelegramDisplayName()
-  const tgUsername = getTelegramUsername()
-  const tgId = getTelegramUserIdString()
-  const tgPhoto = getTelegramPhotoUrl()
+  const { name: tgName, username: tgUsername, id: tgId, photo: tgPhoto } = useTelegramProfile()
   const [tgCopied, setTgCopied] = useState(false)
 
   const [rpcDraft, setRpcDraft] = useState(prefs.rpcUrl)
