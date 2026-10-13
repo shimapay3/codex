@@ -80,6 +80,9 @@ export const DEFAULT_PREFS: Prefs = {
   notifications: true,
   sound: true,
   hideBalances: false,
+  webhookEnabled: false,
+  webhookBotToken: '',
+  webhookTopicUrl: '',
 }
 
 export type Session = 'booting' | 'onboarding' | 'locked' | 'unlocked'

@@ -232,6 +232,80 @@ app.post('/api/user/data', (req, res) => {
   res.json({ ok: true, updatedAt: users[telegramId].updatedAt })
 })
 
+// --- Webhook proxy (Telegram Bot API) ------------------------------------
+// The client sends the bot token, topic URL and message text; the server
+// relays them to the Telegram Bot API so the browser never hits CORS.
+
+function parseTopicUrl(url) {
+  try {
+    const u = new URL(url.trim())
+    if (u.hostname === 't.me' || u.hostname === 'telegram.me') {
+      const parts = u.pathname.split('/').filter(Boolean)
+      if (parts[0] === 'c' && parts[1] && /^\d+$/.test(parts[1])) {
+        const chatId = '-100' + parts[1]
+        const threadId = parts[2] && /^\d+$/.test(parts[2]) ? Number(parts[2]) : null
+        return { chatId, threadId }
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+app.post('/api/webhook/send', async (req, res) => {
+  const { botToken, topicUrl, text } = req.body || {}
+  if (!botToken || typeof botToken !== 'string') {
+    res.status(400).json({ ok: false, error: 'Thiếu bot token' })
+    return
+  }
+  if (!topicUrl || typeof topicUrl !== 'string') {
+    res.status(400).json({ ok: false, error: 'Thiếu link topic' })
+    return
+  }
+  if (!text || typeof text !== 'string') {
+    res.status(400).json({ ok: false, error: 'Thiếu nội dung' })
+    return
+  }
+
+  const parsed = parseTopicUrl(topicUrl)
+  if (!parsed) {
+    res.status(400).json({
+      ok: false,
+      error: 'Link topic không hợp lệ. Ví dụ: https://t.me/c/1234567890/42',
+    })
+    return
+  }
+
+  try {
+    const apiUrl = `https://api.telegram.org/bot${botToken.trim()}/sendMessage`
+    const body = {
+      chat_id: parsed.chatId,
+      text,
+      parse_mode: 'HTML',
+    }
+    if (parsed.threadId != null) body.message_thread_id = parsed.threadId
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 10000)
+    const tgRes = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    const tgJson = await tgRes.json()
+    if (!tgRes.ok || !tgJson.ok) {
+      res.status(400).json({ ok: false, error: tgJson.description || 'Telegram API lỗi' })
+      return
+    }
+    res.json({ ok: true, messageId: tgJson.result?.message_id })
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err?.message || 'Lỗi gửi webhook' })
+  }
+})
+
 load()
 
 const server = http.createServer(app)

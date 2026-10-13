@@ -10,15 +10,19 @@ import {
   Gauge,
   HardDriveDownload,
   KeyRound,
+  Loader2,
   Lock,
   Palette,
   Radio,
   RotateCcw,
+  Send,
   ShieldAlert,
   ShieldCheck,
   Trash2,
   Volume2,
+  Webhook,
 } from 'lucide-react'
+import { sendTestWebhook, parseTopicUrl } from '../lib/webhook'
 import { useWallet } from '../state/WalletProvider'
 import { DEFAULT_RPC_URL, rpcFetch } from '../lib/solana'
 import { copyToClipboard, downloadTextFile, formatVnd } from '../lib/format'
@@ -112,6 +116,10 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
   const [showPin, setShowPin] = useState(false)
   const [revealed, setRevealed] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [tokenDraft, setTokenDraft] = useState(prefs.webhookBotToken)
+  const [topicDraft, setTopicDraft] = useState(prefs.webhookTopicUrl)
+  const [showToken, setShowToken] = useState(false)
+  const [testingWebhook, setTestingWebhook] = useState(false)
 
   const testRpc = async () => {
     setTesting(true)
@@ -355,6 +363,84 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
         >
           <Volume2 size={15} /> Nghe thử chuông nhận tiền
         </button>
+      </Section>
+
+      <Section
+        icon={<Webhook size={15} />}
+        title="Đồng bộ Webhook"
+        hint="Nhập Telegram bot token và link thread topic để đẩy dữ liệu giao dịch lên nhóm. Bật Webhook để hiện nút gửi trong mỗi giao dịch thành công. Tắt vẫn giữ trạng thái đã gửi."
+      >
+        <div className="relative">
+          <input
+            type={showToken ? 'text' : 'password'}
+            value={tokenDraft}
+            onChange={(event) => setTokenDraft(event.target.value)}
+            placeholder="Telegram Bot Token"
+            spellCheck={false}
+            autoComplete="off"
+            className="w-full rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 pr-11 font-mono text-[11.5px] outline-none focus:border-[color:var(--accent)]"
+          />
+          <button
+            type="button"
+            onClick={() => setShowToken((v) => !v)}
+            aria-label={showToken ? 'Ẩn token' : 'Hiện token'}
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[color:var(--muted)] transition hover:bg-white/10"
+          >
+            {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
+        <input
+          value={topicDraft}
+          onChange={(event) => setTopicDraft(event.target.value)}
+          placeholder="Link thread topic (https://t.me/c/…/…)"
+          spellCheck={false}
+          className="w-full rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 font-mono text-[11.5px] outline-none focus:border-[color:var(--accent)]"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            setPrefs({
+              webhookBotToken: tokenDraft.trim(),
+              webhookTopicUrl: topicDraft.trim(),
+            })
+            pushToast({ tone: 'success', title: 'Đã lưu cấu hình Webhook' })
+          }}
+          className="w-full rounded-2xl border border-[color:var(--border)] py-3 text-[13px] font-semibold"
+        >
+          Lưu cấu hình
+        </button>
+        <Row label="Đẩy thông báo Webhook">
+          <Toggle
+            value={prefs.webhookEnabled}
+            onChange={(value) => setPrefs({ webhookEnabled: value })}
+          />
+        </Row>
+        <button
+          type="button"
+          disabled={testingWebhook || !tokenDraft.trim() || !topicDraft.trim()}
+          onClick={async () => {
+            setTestingWebhook(true)
+            try {
+              const result = await sendTestWebhook(tokenDraft, topicDraft)
+              if (result.ok) {
+                pushToast({ tone: 'success', title: 'Test Webhook thành công', body: 'Đã gửi tin nhắn test lên topic' })
+              } else {
+                pushToast({ tone: 'error', title: 'Test Webhook thất bại', body: result.error })
+              }
+            } finally {
+              setTestingWebhook(false)
+            }
+          }}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--border)] py-3 text-[13px] font-semibold disabled:opacity-50"
+        >
+          {testingWebhook ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+          Thử gửi test
+        </button>
+        {topicDraft.trim() && !parseTopicUrl(topicDraft) && (
+          <p className="text-[10.5px] leading-relaxed text-[#ff8fa1]">
+            ⚠ Link topic không hợp lệ. Định dạng: https://t.me/c/1234567890/42
+          </p>
+        )}
       </Section>
 
       <Section

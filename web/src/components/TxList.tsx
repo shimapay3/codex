@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import { ArrowDownLeft, ArrowUpRight, ExternalLink, Sparkles, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowDownLeft, ArrowUpRight, Check, ExternalLink, Loader2, Send, Sparkles, Webhook, X } from 'lucide-react'
 import { TxEntry, formatAmount } from '../lib/solana'
 import { splitMemo } from '../lib/categories'
 import { copyToClipboard, formatUsd, formatVnd, fullDateTime, relativeTime } from '../lib/format'
 import { useWallet } from '../state/WalletProvider'
+import { sendWebhook, isWebhookSent, markWebhookSent, buildTxMessage } from '../lib/webhook'
 import UsdcAvatar from './UsdcAvatar'
 
 function AmountLine({ entry }: { entry: TxEntry }) {
@@ -37,6 +38,15 @@ export function TxRow({ entry, onSelect }: { entry: TxEntry; onSelect: (entry: T
   const color = meta?.category ? undefined : category.color
   const label = parsed.title || meta?.wish || category.label
   const contact = entry.counterparty ? contacts.find((c) => c.address === entry.counterparty) : null
+  const [webhookSent, setWebhookSent] = useState(() => isWebhookSent(entry.signature))
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      if ((e as CustomEvent).detail === entry.signature) setWebhookSent(true)
+    }
+    window.addEventListener('webhook-sent', handler)
+    return () => window.removeEventListener('webhook-sent', handler)
+  }, [entry.signature])
 
   return (
     <button
@@ -73,6 +83,11 @@ export function TxRow({ entry, onSelect }: { entry: TxEntry; onSelect: (entry: T
               {contact.name}
             </span>
           )}
+          {webhookSent && (
+            <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-[#229ED9]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#229ED9]">
+              <Webhook size={9} /> Đã gửi
+            </span>
+          )}
         </span>
         {entry.memo && (
           <span className="mt-0.5 block truncate text-[11.5px] text-[color:var(--muted)]">{entry.memo}</span>
@@ -85,8 +100,15 @@ export function TxRow({ entry, onSelect }: { entry: TxEntry; onSelect: (entry: T
 }
 
 export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: () => void }) {
-  const { price, prefs, contacts } = useWallet()
+  const { price, prefs, contacts, activeWallet, pushToast } = useWallet()
   const [copied, setCopied] = useState(false)
+  const [webhookSent, setWebhookSent] = useState(false)
+  const [sendingWebhook, setSendingWebhook] = useState(false)
+
+  useEffect(() => {
+    if (entry) setWebhookSent(isWebhookSent(entry.signature))
+  }, [entry])
+
   if (!entry) return null
 
   const parsed = splitMemo(entry.memo)
@@ -196,6 +218,40 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
             <ExternalLink size={15} /> Kiểm tra
           </a>
         </div>
+
+        {webhookSent && (
+          <div className="mt-3 flex items-center justify-center gap-1.5 rounded-2xl border border-[#229ED9]/30 bg-[#229ED9]/10 px-4 py-2.5 text-[12px] font-semibold text-[#229ED9]">
+            <Check size={14} /> Webhook đã gửi thành công
+          </div>
+        )}
+
+        {prefs.webhookEnabled && entry.status === 'success' && !webhookSent && (
+          <button
+            type="button"
+            disabled={sendingWebhook || !prefs.webhookBotToken || !prefs.webhookTopicUrl}
+            onClick={async () => {
+              if (!entry || !activeWallet) return
+              setSendingWebhook(true)
+              try {
+                const message = buildTxMessage(entry, activeWallet.name, activeWallet.address)
+                const result = await sendWebhook(prefs.webhookBotToken, prefs.webhookTopicUrl, message)
+                if (result.ok) {
+                  markWebhookSent(entry.signature)
+                  setWebhookSent(true)
+                  pushToast({ tone: 'success', title: 'Webhook đã gửi', body: 'Dữ liệu giao dịch đã đẩy lên topic' })
+                } else {
+                  pushToast({ tone: 'error', title: 'Gửi webhook thất bại', body: result.error })
+                }
+              } finally {
+                setSendingWebhook(false)
+              }
+            }}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-[#229ED9]/40 py-3 text-[13px] font-semibold text-[#229ED9] disabled:opacity-50"
+          >
+            {sendingWebhook ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+            Gửi Webhook
+          </button>
+        )}
 
         {prefs.fiat === 'usd' && (
           <p className="mt-3 text-center text-[11px] text-[color:var(--muted)]">

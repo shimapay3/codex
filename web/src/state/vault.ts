@@ -49,6 +49,9 @@ export type Prefs = {
   notifications: boolean
   sound: boolean
   hideBalances: boolean
+  webhookEnabled: boolean
+  webhookBotToken: string
+  webhookTopicUrl: string
 }
 
 export type VaultData = {
