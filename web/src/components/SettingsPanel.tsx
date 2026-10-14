@@ -415,6 +415,14 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
             onChange={(value) => setPrefs({ webhookEnabled: value })}
           />
         </Row>
+        {prefs.webhookBotToken.trim() && prefs.webhookTopicUrl.trim() && (
+          <Row label="Tự động gửi sau giao dịch">
+            <Toggle
+              value={prefs.webhookAutoSend}
+              onChange={(value) => setPrefs({ webhookAutoSend: value })}
+            />
+          </Row>
+        )}
         <button
           type="button"
           disabled={testingWebhook || !tokenDraft.trim() || !topicDraft.trim()}

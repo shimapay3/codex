@@ -38,6 +38,7 @@ import {
   vibrate,
 } from '../lib/notify'
 import { applyTheme } from '../lib/theme'
+import { sendWebhook, buildTxMessage, markWebhookSent, isWebhookSent } from '../lib/webhook'
 import { readLocal, writeLocal, removeLocal, StorageKeys, getOrCreateDeviceId } from '../lib/storage'
 import { getTelegramUser, getTelegramUserIdString, telegramReady, isTelegramWebApp, type TelegramUser } from '../lib/telegram'
 import { useRealtimePoll, type SyncResponse } from './useRealtimePoll'
@@ -83,6 +84,7 @@ export const DEFAULT_PREFS: Prefs = {
   webhookEnabled: false,
   webhookBotToken: '',
   webhookTopicUrl: '',
+  webhookAutoSend: false,
 }
 
 export type Session = 'booting' | 'onboarding' | 'locked' | 'unlocked'
@@ -1200,6 +1202,31 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           body: `${params.amount} USDC đã gửi`,
           signature,
         })
+
+        // Auto-send webhook if enabled and config is complete
+        if (prefs.webhookAutoSend && prefs.webhookBotToken.trim() && prefs.webhookTopicUrl.trim() && !isWebhookSent(signature)) {
+          const contact = current.contacts.find((c) => c.address === params.to.trim())
+          const txEntry: TxEntry = {
+            signature,
+            slot: 0,
+            blockTime: Math.floor(Date.now() / 1000),
+            direction: 'out',
+            amount: params.amount,
+            decimals: balance.decimals || USDC_DECIMALS_FALLBACK,
+            status: 'success',
+            memo: params.memo || '',
+            counterparty: params.to.trim(),
+            explorerUrl: `https://explorer.solana.com/tx/${signature}`,
+          }
+          const message = buildTxMessage(txEntry, wallet.name, wallet.address, contact?.name)
+          void sendWebhook(prefs.webhookBotToken, prefs.webhookTopicUrl, message).then((result) => {
+            if (result.ok) {
+              markWebhookSent(signature)
+              pushToast({ tone: 'info', title: 'Webhook đã tự động gửi', body: 'Dữ liệu giao dịch đã đẩy lên topic' })
+            }
+          })
+        }
+
         void refresh()
         return signature
       } catch (error: any) {
@@ -1210,7 +1237,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         throw new Error(message)
       }
     },
-    [balance.decimals, persist, prefs.notifications, prefs.sound, pushToast, refresh],
+    [balance.decimals, persist, prefs.notifications, prefs.sound, prefs.webhookAutoSend, prefs.webhookBotToken, prefs.webhookTopicUrl, pushToast, refresh],
   )
 
   // --- send SOL -------------------------------------------------------------
@@ -1241,6 +1268,31 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           body: `${params.amount} SOL đã gửi`,
           signature,
         })
+
+        // Auto-send webhook if enabled and config is complete
+        if (prefs.webhookAutoSend && prefs.webhookBotToken.trim() && prefs.webhookTopicUrl.trim() && !isWebhookSent(signature)) {
+          const contact = current.contacts.find((c) => c.address === params.to.trim())
+          const txEntry: TxEntry = {
+            signature,
+            slot: 0,
+            blockTime: Math.floor(Date.now() / 1000),
+            direction: 'out',
+            amount: params.amount,
+            decimals: 9,
+            status: 'success',
+            memo: params.memo || '',
+            counterparty: params.to.trim(),
+            explorerUrl: `https://explorer.solana.com/tx/${signature}`,
+          }
+          const message = buildTxMessage(txEntry, wallet.name, wallet.address, contact?.name)
+          void sendWebhook(prefs.webhookBotToken, prefs.webhookTopicUrl, message).then((result) => {
+            if (result.ok) {
+              markWebhookSent(signature)
+              pushToast({ tone: 'info', title: 'Webhook đã tự động gửi', body: 'Dữ liệu giao dịch đã đẩy lên topic' })
+            }
+          })
+        }
+
         void refresh()
         return signature
       } catch (error: any) {
@@ -1251,7 +1303,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         throw new Error(message)
       }
     },
-    [prefs.notifications, prefs.sound, pushToast, refresh],
+    [prefs.notifications, prefs.sound, prefs.webhookAutoSend, prefs.webhookBotToken, prefs.webhookTopicUrl, pushToast, refresh],
   )
 
   const exportSecrets = useCallback(

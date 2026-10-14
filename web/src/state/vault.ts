@@ -52,6 +52,7 @@ export type Prefs = {
   webhookEnabled: boolean
   webhookBotToken: string
   webhookTopicUrl: string
+  webhookAutoSend: boolean
 }
 
 export type VaultData = {
