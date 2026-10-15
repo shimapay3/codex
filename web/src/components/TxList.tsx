@@ -193,6 +193,12 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
             { label: 'Thời gian', value: fullDateTime(entry.blockTime) },
             { label: 'Slot', value: String(entry.slot) },
             {
+              label: 'Phí SOL',
+              value: entry.fee != null && entry.fee > 0
+                ? `◎${entry.fee.toFixed(9)} SOL`
+                : '◎0.000005 SOL (ước tính)',
+            },
+            {
               label: entry.direction === 'in' ? 'Từ' : 'Đến',
               value: contact ? contact.name : (entry.counterparty || 'Không xác định'),
             },

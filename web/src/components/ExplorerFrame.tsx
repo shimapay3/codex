@@ -105,7 +105,7 @@ async function lookupTx(rpcUrl: string, signature: string): Promise<TxResult> {
           signature: data.signature,
           slot: data.slot || 0,
           blockTime: data.blockTime ?? null,
-          fee: data.fee ?? 0,
+          fee: data.fee ?? 0.000005,
           status: (data.status as 'success' | 'failed') || 'success',
           memo: data.memo || '',
           direction: data.direction,
@@ -119,7 +119,7 @@ async function lookupTx(rpcUrl: string, signature: string): Promise<TxResult> {
               }))
             : (data.amount != null ? [{
                 amount: data.amount,
-                decimals: data.decimals || 6,
+                decimals: data.decimals || 9,
                 from: data.walletAddress || '',
                 to: data.counterparty || '',
                 mint: USDC_MINT,

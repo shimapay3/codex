@@ -1244,6 +1244,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
               direction: 'out',
               amount: params.amount,
               decimals,
+              fee: result.fee || 0,
               status: 'pending',
               memo: params.memo || '',
               counterparty: params.to.trim(),
@@ -1264,7 +1265,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           throw new Error('Giao dịch đang chờ xác nhận trên mạng lưới (quá 30 giây). Tính năng gửi tạm thời bị vô hiệu hoá — sync sẽ kiểm tra lại.')
         }
 
-        const { signature, slot, blockTime } = result
+        const { signature, slot, blockTime, fee } = result
 
         const meta = { ...current.txMeta }
         meta[signature] = {
@@ -1300,6 +1301,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             direction: 'out',
             amount: params.amount,
             decimals,
+            fee,
             status: 'success',
             memo: params.memo || '',
             counterparty: params.to.trim(),
@@ -1319,6 +1321,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             direction: 'out',
             amount: params.amount,
             decimals,
+            fee,
             status: 'success',
             memo: params.memo || '',
             counterparty: params.to.trim(),
@@ -1379,6 +1382,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
                   direction: 'out',
                   amount: params.amount,
                   decimals,
+                  fee: 0,
                   status: 'success',
                   memo: params.memo || '',
                   counterparty: params.to.trim(),
@@ -1437,6 +1441,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
               direction: 'out',
               amount: params.amount,
               decimals: 9,
+              fee: result.fee || 0,
               status: 'pending',
               memo: params.memo || '',
               counterparty: params.to.trim(),
@@ -1457,7 +1462,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           throw new Error('Giao dịch đang chờ xác nhận trên mạng lưới (quá 30 giây). Tính năng gửi tạm thời bị vô hiệu hoá — sync sẽ kiểm tra lại.')
         }
 
-        const { signature, slot, blockTime } = result
+        const { signature, slot, blockTime, fee } = result
 
         if (prefs.sound) ringSuccess()
         vibrate([60, 40, 120])
@@ -1485,6 +1490,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             direction: 'out',
             amount: params.amount,
             decimals: 9,
+            fee,
             status: 'success',
             memo: params.memo || '',
             counterparty: params.to.trim(),
@@ -1504,6 +1510,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             direction: 'out',
             amount: params.amount,
             decimals: 9,
+            fee,
             status: 'success',
             memo: params.memo || '',
             counterparty: params.to.trim(),

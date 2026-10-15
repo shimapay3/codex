@@ -230,7 +230,7 @@ export type SendParams = {
   decimals: number
 }
 
-export type SendResult = { signature: string; slot: number; blockTime: number; status: 'success' | 'pending' }
+export type SendResult = { signature: string; slot: number; blockTime: number; fee: number; status: 'success' | 'pending' }
 
 export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals }: SendParams) {
   const recipient = new PublicKey(to)
@@ -303,6 +303,7 @@ export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals }: Sen
       signature,
       slot: 0,
       blockTime: Math.floor(Date.now() / 1000),
+      fee: 0,
       status: 'pending' as const,
     }
   }
@@ -318,6 +319,7 @@ export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals }: Sen
       signature,
       slot: txInfo?.slot ?? 0,
       blockTime: txInfo?.blockTime ?? Math.floor(Date.now() / 1000),
+      fee: (txInfo?.meta?.fee || 0) / 1_000_000_000,
       status: 'success' as const,
     }
   } catch {
@@ -326,6 +328,7 @@ export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals }: Sen
       signature,
       slot: 0,
       blockTime: Math.floor(Date.now() / 1000),
+      fee: 0,
       status: 'success' as const,
     }
   }
@@ -367,6 +370,7 @@ export type TxEntry = {
   direction: 'in' | 'out' | 'self' | 'other'
   amount: number
   decimals: number
+  fee: number
   status: 'success' | 'failed' | 'pending'
   memo: string
   counterparty: string | null
@@ -553,6 +557,7 @@ export async function fetchTokenHistory(
           direction,
           amount: Math.abs(delta),
           decimals,
+          fee: (tx?.meta?.fee || 0) / 1_000_000_000,
           status: item.err || tx?.meta?.err ? 'failed' : 'success',
           memo: extractMemo(tx),
           counterparty,
@@ -608,6 +613,7 @@ export async function fetchTransactionSummary(
       direction: Math.abs(delta) < 1e-9 ? 'other' : delta > 0 ? 'in' : 'out',
       amount: Math.abs(delta),
       decimals,
+      fee: (tx?.meta?.fee || 0) / 1_000_000_000,
       status: tx?.meta?.err ? 'failed' : 'success',
       memo: extractMemo(tx),
       counterparty: others[0]?.owner ?? null,
@@ -723,6 +729,7 @@ export async function transferSol(
       signature,
       slot: 0,
       blockTime: Math.floor(Date.now() / 1000),
+      fee: 0,
       status: 'pending' as const,
     }
   }
@@ -737,6 +744,7 @@ export async function transferSol(
       signature,
       slot: txInfo?.slot ?? 0,
       blockTime: txInfo?.blockTime ?? Math.floor(Date.now() / 1000),
+      fee: (txInfo?.meta?.fee || 0) / 1_000_000_000,
       status: 'success' as const,
     }
   } catch {
@@ -744,6 +752,7 @@ export async function transferSol(
       signature,
       slot: 0,
       blockTime: Math.floor(Date.now() / 1000),
+      fee: 0,
       status: 'success' as const,
     }
   }
@@ -803,6 +812,7 @@ export type CloudTxRecord = {
   direction: 'in' | 'out' | 'self' | 'other'
   amount: number
   decimals: number
+  fee: number
   status: 'success' | 'failed' | 'pending'
   memo: string
   counterparty: string | null

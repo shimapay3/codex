@@ -1,6 +1,6 @@
 import { rpcMethod, sanitizeRpcUrl, DEFAULT_RPC } from './rpc.mjs'
 import { getState } from './store.mjs'
-import { getUserCloudTxHistory, getCloudTxsForAddress, updateCloudTxStatus } from './explorer.mjs'
+import { getUserCloudTxHistory, getCloudTxsForAddress, updateCloudTxStatus, normalizeCloudTxAmount, estimateFeeFromCloudTxs } from './explorer.mjs'
 
 /**
  * Unified sync endpoint — the single realtime API the client polls every 5 s.
@@ -229,6 +229,9 @@ async function fetchRecentTxs(rpcUrl, owner, limit = 15) {
 
           const direction = Math.abs(delta) < 1e-9 ? 'other' : delta > 0 ? 'in' : 'out'
 
+          // Phí SOL thực từ validator (lamports → SOL)
+          const fee = lamportsToSol(tx?.meta?.fee || 0)
+
           return {
             signature: item.signature,
             slot: item.slot,
@@ -236,6 +239,7 @@ async function fetchRecentTxs(rpcUrl, owner, limit = 15) {
             direction,
             amount: Math.abs(delta),
             decimals,
+            fee,
             status: item.err || tx?.meta?.err ? 'failed' : 'success',
             memo,
             counterparty: others[0]?.owner ?? null,
@@ -334,15 +338,18 @@ export async function handleSync(req, res) {
     // When telegramId is provided, use cloud transaction history instead of
     // RPC (avoids validator slot overflow / empty history).
     let transactions
+    let fromCloud = false
     if (telegramId) {
       const cloudTxs = getUserCloudTxHistory(telegramId, address)
       if (cloudTxs.length > 0) {
         transactions = cloudTxs.slice(0, 15)
+        fromCloud = true
       } else {
         // Fallback: check txIndex by address (populated even if user txHistory is empty)
         const indexTxs = getCloudTxsForAddress(address)
         if (indexTxs.length > 0) {
           transactions = indexTxs.slice(0, 15)
+          fromCloud = true
         } else {
           transactions = await fetchRecentTxs(rpcUrl, address, 15)
         }
@@ -352,6 +359,7 @@ export async function handleSync(req, res) {
       const indexTxs = getCloudTxsForAddress(address)
       if (indexTxs.length > 0) {
         transactions = indexTxs.slice(0, 15)
+        fromCloud = true
       } else {
         transactions = await fetchRecentTxs(rpcUrl, address, 15)
       }
@@ -360,6 +368,16 @@ export async function handleSync(req, res) {
     // Requirement 1: re-check pending transactions before returning
     if (transactions && transactions.length) {
       transactions = await recheckPendingTxs(rpcUrl, transactions)
+    }
+
+    // Áp dụng phí ước tính cho tx có fee=0 (validator pruned)
+    if (transactions && transactions.length) {
+      const estFee = estimateFeeFromCloudTxs(transactions)
+      for (const tx of transactions) {
+        if (tx.fee == null || tx.fee === 0) {
+          tx.fee = estFee
+        }
+      }
     }
 
     const [usdc, sol, price] = await Promise.all([

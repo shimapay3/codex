@@ -17,8 +17,65 @@ const TOKEN_2022 = 'TokenzQdBNbLqP5VEhPkASv1L5Xuo6YHuHD4qLm9Q'
 const SOL_ICON = 'https://explorer.solana.com/icon-144.png'
 const USDC_ICON = 'https://usdc.dolaxanh.com/a/ACg8ocJtRSV_No5FrhpG55lc3nUSspbIExRO0CVJIMLt4SXgiobyEoI5=s72-c-no'
 
+/** Cloud Chain USDC luôn dùng 9 decimals — không phải 6 như mainnet. */
+const USDC_DECIMALS = 9
+/** Phí giao dịch mặc định trên Solana (~5000 lamports). */
+const DEFAULT_FEE_SOL = 0.000005
+
 function lamportsToSol(lamports) {
   return (typeof lamports === 'number' ? lamports : 0) / 1_000_000_000
+}
+
+/**
+ * Chuẩn hoá số tiền USDC trong bản ghi cloud.
+ * Cloud Chain USDC dùng 9 decimals.  Một số bản ghi cũ bị sai:
+ *  - decimals=6 (fallback) + amount=raw/10^6  → chia tiếp 1000 để ra raw/10^9
+ *  - decimals=9 + amount=raw (chưa chia)       → chia 10^9
+ *  - decimals=6 + amount đã đúng (human)      → chỉ sửa decimals thành 9
+ *
+ * Heuristic: chỉ re-normalise khi amount là số nguyên > 100 (raw/10^6 luôn
+ * nguyên) — tránh phá giá trị human-readable nhỏ.
+ */
+export function normalizeCloudTxAmount(tx) {
+  if (!tx) return tx
+  const isSol = tx.tokenSymbol === 'SOL'
+  if (!isSol && tx.decimals != null && tx.decimals !== USDC_DECIMALS) {
+    const oldDec = tx.decimals
+    if (Number.isInteger(tx.amount) && tx.amount > 100) {
+      // amount = raw / 10^oldDec → correct = raw / 10^9
+      const raw = tx.amount * Math.pow(10, oldDec)
+      tx.amount = raw / Math.pow(10, USDC_DECIMALS)
+    }
+    tx.decimals = USDC_DECIMALS
+  } else if (!isSol && tx.decimals == null) {
+    tx.decimals = USDC_DECIMALS
+  }
+  // Trường hợp amount vẫn là raw (rất lớn) dù decimals=9
+  if (!isSol && tx.decimals === USDC_DECIMALS && tx.amount > 1_000_000 && Number.isInteger(tx.amount)) {
+    tx.amount = tx.amount / Math.pow(10, USDC_DECIMALS)
+  }
+  return tx
+}
+
+/**
+ * Tìm phí SOL gần nhất khác 0 từ danh sách cloud tx, dùng làm phí ước tính
+ * khi validator đã prune (fee=0).
+ */
+export function estimateFeeFromCloudTxs(txs) {
+  if (!Array.isArray(txs)) return DEFAULT_FEE_SOL
+  const withFee = txs.filter((t) => t && typeof t.fee === 'number' && t.fee > 0)
+  if (withFee.length > 0) return withFee[0].fee
+  return DEFAULT_FEE_SOL
+}
+
+/** Áp dụng phí ước tính cho các tx có fee=0 (validator pruned). */
+function applyFeeEstimate(txs, estimatedFee) {
+  for (const tx of txs) {
+    if (tx && (tx.fee == null || tx.fee === 0)) {
+      tx.fee = estimatedFee
+    }
+  }
+  return txs
 }
 
 function normalizeAddress(value) {
@@ -83,14 +140,19 @@ export function getCloudTxsForAddress(address) {
   const records = sigs
     .map((sig) => txIndex.bySignature[sig])
     .filter(Boolean)
+    .map(normalizeCloudTxAmount)
     .sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0))
+  // Áp dụng phí ước tính cho tx có fee=0
+  const estFee = estimateFeeFromCloudTxs(records)
+  applyFeeEstimate(records, estFee)
   return records
 }
 
 function getCloudTx(signature) {
   const state = getState()
   const txIndex = state.txIndex || { byAddress: {}, bySignature: {} }
-  return txIndex.bySignature[signature] || null
+  const tx = txIndex.bySignature[signature]
+  return tx ? normalizeCloudTxAmount(tx) : null
 }
 
 function extractMemo(tx) {
@@ -191,9 +253,14 @@ export function getUserCloudTxHistory(telegramId, walletAddress) {
   if (!state.users || !state.users[telegramId]) return []
   const history = state.users[telegramId].txHistory || []
   if (!walletAddress) return history
-  return history
+  const records = history
     .filter((tx) => tx.walletAddress === walletAddress || tx.counterparty === walletAddress)
+    .map(normalizeCloudTxAmount)
     .sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0))
+  // Áp dụng phí ước tính cho tx có fee=0
+  const estFee = estimateFeeFromCloudTxs(records)
+  applyFeeEstimate(records, estFee)
+  return records
 }
 
 /** CORS headers for explorer endpoints (read-only, cross-origin from chain.localusd.cloud). */
@@ -223,15 +290,17 @@ export async function handleExplorerAddress(req, res) {
     // Adjust direction relative to the queried address:
     // - walletAddress === address → 'out' (this address sent)
     // - counterparty  === address → 'in'  (this address received)
+    // Also apply fee estimate for pruned transactions.
+    const estFee = estimateFeeFromCloudTxs(rawTxs)
     const transactions = rawTxs.slice(0, 50).map((tx) => {
+      const fee = tx.fee != null && tx.fee > 0 ? tx.fee : estFee
       if (tx.counterparty === address && tx.walletAddress !== address) {
-        // Viewing from receiver's perspective: counterparty = sender
-        return { ...tx, direction: 'in', counterparty: tx.walletAddress }
+        return { ...tx, direction: 'in', counterparty: tx.walletAddress, fee }
       }
       if (tx.walletAddress === address && tx.counterparty !== address) {
-        return { ...tx, direction: 'out' }
+        return { ...tx, direction: 'out', fee }
       }
-      return tx
+      return { ...tx, fee }
     })
 
     res.json({
@@ -262,6 +331,11 @@ export async function handleExplorerTx(req, res) {
   // 1. Check cloud db first
   const cloudTx = getCloudTx(signature)
   if (cloudTx) {
+    // Đảm bảo tx cloud có phí SOL (ước tính nếu validator đã prune)
+    if (cloudTx.fee == null || cloudTx.fee === 0) {
+      const allTxs = getCloudTxsForAddress(cloudTx.walletAddress || '')
+      cloudTx.fee = estimateFeeFromCloudTxs(allTxs)
+    }
     res.json({ ...cloudTx, fromCloud: true })
     return
   }

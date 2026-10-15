@@ -62,6 +62,10 @@ export function buildTxMessage(
   const time = entry.blockTime ? fullDateTime(entry.blockTime) : 'Không xác định'
   const counterparty = entry.counterparty || 'Không xác định'
 
+  const feeSol = entry.fee != null && entry.fee > 0
+    ? `◎${entry.fee.toFixed(9)} SOL`
+    : '◎0.000005 SOL (ước tính)'
+
   return [
     '🔔 <b>Giao dịch 💠 USDC</b>',
     '',
@@ -69,6 +73,7 @@ export function buildTxMessage(
     `<b>Địa chỉ:</b> <code>${walletAddress}</code>`,
     `<b>Loại:</b> ${direction}`,
     `<b>Số lượng:</b> 💠 ${formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} USDC (≈ ${formatVnd(entry.amount * 30000)})`,
+    `<b>Phí SOL:</b> ${feeSol}`,
     `<b>Trạng thái:</b> ${status}`,
     entry.memo ? `<b>Memo:</b> ${entry.memo}` : '',
     contactName
