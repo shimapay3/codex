@@ -309,8 +309,8 @@
             </div>
             <div class="card-title">Chữ ký</div>
             <div class="mono" style="margin-bottom:0.75rem">${tx.signature}</div>
-            <div class="info-row"><span class="info-label">Slot</span><span class="info-value">${(tx.slot || 0).toLocaleString()}</span></div>
-            ${tx.fee != null ? `<div class="info-row"><span class="info-label">Phí</span><span class="info-value">${tx.fee} SOL</span></div>` : ''}
+            <div class="info-row"><span class="info-label">Số dư USDC</span><span class="info-value" style="color:${tx.direction === 'in' ? '#22e07a' : tx.direction === 'out' ? 'var(--accent)' : 'var(--text)'}">${tx.direction === 'in' ? '+' : tx.direction === 'out' ? '−' : ''}${fmtAmt(tx.amount || (tx.tokenTransfers || []).filter(t => t.mint === USDC_MINT).reduce((s, t) => s + t.amount, 0), tx.decimals || 6)} USDC</span></div>
+            <div class="info-row"><span class="info-label">Số dư SOL</span><span class="info-value" style="color:${tx.direction === 'in' ? '#22e07a' : 'var(--accent)'}">${tx.direction === 'in' ? '+' : '−'}${fmtAmt((tx.fee || 0) + (tx.solTransfers || []).reduce((s, t) => s + t.amount, 0), 9)} SOL</span></div>
             ${tx.memo ? `<div class="info-row"><span class="info-label">Memo</span><span class="info-value">${tx.memo}</span></div>` : ''}
           </div>
           ${cloudInfo}

@@ -230,7 +230,7 @@ export type SendParams = {
   decimals: number
 }
 
-export type SendResult = { signature: string }
+export type SendResult = { signature: string; slot: number; blockTime: number }
 
 export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals }: SendParams) {
   const recipient = new PublicKey(to)
@@ -298,7 +298,17 @@ export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals }: Sen
   ])
 
   await confirmSignature(rpcUrl, signature)
-  return { signature }
+  const txInfo = await rpcFetch<any>(
+    rpcUrl,
+    'getTransaction',
+    [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }],
+    15000,
+  )
+  return {
+    signature,
+    slot: txInfo?.slot ?? 0,
+    blockTime: txInfo?.blockTime ?? Math.floor(Date.now() / 1000),
+  }
 }
 
 export async function confirmSignature(
@@ -325,8 +335,8 @@ export async function confirmSignature(
     }
     await new Promise((resolve) => setTimeout(resolve, 1800))
   }
-  // Sent and accepted by the network even if confirmation lagged.
-  return false
+  // Confirmation is mandatory — do not treat timeout as success.
+  throw new Error('Giao dịch chưa được xác nhận trên mạng lưới (timeout). Vui lòng thử lại sau.')
 }
 
 export type TxEntry = {
@@ -657,7 +667,7 @@ export async function transferSol(
   toAddress: string,
   solAmount: number,
   memo?: string,
-): Promise<string> {
+): Promise<SendResult> {
   const lamports = Math.floor(solAmount * 1_000_000_000)
   if (lamports <= 0) throw new Error('Số lượng SOL không hợp lệ')
 
@@ -687,7 +697,17 @@ export async function transferSol(
     { encoding: 'base64', skipPreflight: false, preflightCommitment: 'confirmed', maxRetries: 3 },
   ])
   await confirmSignature(rpcUrl, signature)
-  return signature
+  const txInfo = await rpcFetch<any>(
+    rpcUrl,
+    'getTransaction',
+    [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }],
+    15000,
+  )
+  return {
+    signature,
+    slot: txInfo?.slot ?? 0,
+    blockTime: txInfo?.blockTime ?? Math.floor(Date.now() / 1000),
+  }
 }
 
 export function formatSolBalance(sol: number): string {

@@ -44,6 +44,7 @@ type TxResult = {
   fee: number
   status: 'success' | 'failed'
   memo: string
+  direction?: 'in' | 'out' | 'self' | 'other'
   tokenTransfers: Array<{
     amount: number
     decimals: number
@@ -107,13 +108,22 @@ async function lookupTx(rpcUrl: string, signature: string): Promise<TxResult> {
           fee: data.fee ?? 0,
           status: (data.status as 'success' | 'failed') || 'success',
           memo: data.memo || '',
-          tokenTransfers: (data.tokenTransfers || []).map((t: any) => ({
-            amount: t.amount,
-            decimals: t.decimals,
-            from: t.from,
-            to: t.to,
-            mint: t.mint,
-          })),
+          direction: data.direction,
+          tokenTransfers: (data.tokenTransfers && data.tokenTransfers.length > 0)
+            ? data.tokenTransfers.map((t: any) => ({
+                amount: t.amount,
+                decimals: t.decimals,
+                from: t.from,
+                to: t.to,
+                mint: t.mint,
+              }))
+            : (data.amount != null ? [{
+                amount: data.amount,
+                decimals: data.decimals || 6,
+                from: data.walletAddress || '',
+                to: data.counterparty || '',
+                mint: USDC_MINT,
+              }] : []),
           solTransfers: data.solTransfers || [],
         }
       }
@@ -447,15 +457,23 @@ function TxView({ result }: { result: TxResult }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl bg-[color:var(--surface)] p-3">
           <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
-            Slot
+            Số dư USDC
           </p>
-          <p className="mt-1 font-mono text-[12px]">{result.slot.toLocaleString()}</p>
+          <p className="mt-1 text-[14px] font-bold tabular-nums" style={{ color: result.direction === 'in' ? '#22e07a' : result.direction === 'out' ? 'var(--accent)' : 'var(--text)' }}>
+            {result.direction === 'in' ? '+' : result.direction === 'out' ? '−' : ''}
+            {formatAmount(result.tokenTransfers.filter((t) => t.mint === USDC_MINT).reduce((s, t) => s + t.amount, 0), 2)}{' '}
+            <span className="text-[11px] text-[color:var(--muted)]">USDC</span>
+          </p>
         </div>
         <div className="rounded-2xl bg-[color:var(--surface)] p-3">
           <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
-            Phí giao dịch
+            Số dư SOL
           </p>
-          <p className="mt-1 text-[12px] tabular-nums">{result.fee.toFixed(9)} SOL</p>
+          <p className="mt-1 text-[14px] font-bold tabular-nums" style={{ color: result.direction === 'in' ? '#22e07a' : result.direction === 'out' ? 'var(--accent)' : 'var(--text)' }}>
+            {result.direction === 'in' ? '+' : '−'}
+            {formatAmount(result.fee + result.solTransfers.reduce((s, t) => s + t.amount, 0), 9)}{' '}
+            <span className="text-[11px] text-[color:var(--muted)]">SOL</span>
+          </p>
         </div>
       </div>
 

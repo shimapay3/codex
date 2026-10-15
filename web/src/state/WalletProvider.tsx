@@ -1209,7 +1209,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const keypair = Keypair.fromSecretKey(Uint8Array.from(wallet.secret))
 
       try {
-        const { signature } = await sendUsdc({
+        const { signature, slot, blockTime } = await sendUsdc({
           rpcUrl: rpcUrlNow,
           from: keypair,
           to: params.to.trim(),
@@ -1247,8 +1247,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         if (tgId) {
           void pushCloudTx(tgId, {
             signature,
-            slot: 0,
-            blockTime: Math.floor(Date.now() / 1000),
+            slot,
+            blockTime,
             direction: 'out',
             amount: params.amount,
             decimals: balance.decimals || USDC_DECIMALS_FALLBACK,
@@ -1266,8 +1266,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           const contact = current.contacts.find((c) => c.address === params.to.trim())
           const txEntry: TxEntry = {
             signature,
-            slot: 0,
-            blockTime: Math.floor(Date.now() / 1000),
+            slot,
+            blockTime,
             direction: 'out',
             amount: params.amount,
             decimals: balance.decimals || USDC_DECIMALS_FALLBACK,
@@ -1309,7 +1309,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const keypair = Keypair.fromSecretKey(Uint8Array.from(wallet.secret))
 
       try {
-        const signature = await transferSol(rpcUrlNow, keypair, params.to.trim(), params.amount, params.memo)
+        const { signature, slot, blockTime } = await transferSol(rpcUrlNow, keypair, params.to.trim(), params.amount, params.memo)
 
         if (prefs.sound) ringSuccess()
         vibrate([60, 40, 120])
@@ -1332,8 +1332,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         if (tgId) {
           void pushCloudTx(tgId, {
             signature,
-            slot: 0,
-            blockTime: Math.floor(Date.now() / 1000),
+            slot,
+            blockTime,
             direction: 'out',
             amount: params.amount,
             decimals: 9,
@@ -1351,8 +1351,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           const contact = current.contacts.find((c) => c.address === params.to.trim())
           const txEntry: TxEntry = {
             signature,
-            slot: 0,
-            blockTime: Math.floor(Date.now() / 1000),
+            slot,
+            blockTime,
             direction: 'out',
             amount: params.amount,
             decimals: 9,
