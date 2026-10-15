@@ -34,7 +34,7 @@ export const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqX
 
 export const EXPLORER_BASE = 'https://chain.localusd.cloud'
 export const SOL_ICON = 'https://explorer.solana.com/icon-144.png'
-export const EXPLORER_CUSTOM_URL = 'https://localusd.cloud/'
+export const EXPLORER_CUSTOM_URL = 'https://rpc.localusd.cloud'
 export const USDC_DECIMALS_FALLBACK = 6
 export const MAX_WALLETS = 5
 

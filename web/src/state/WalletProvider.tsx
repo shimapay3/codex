@@ -28,6 +28,7 @@ import {
   fetchUserCloudData,
   pushUserCloudData,
   pushCloudTx,
+  explorerTxUrl,
 } from '../lib/solana'
 import {
   primeAudio,
@@ -1273,7 +1274,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             status: 'success',
             memo: params.memo || '',
             counterparty: params.to.trim(),
-            explorerUrl: `https://chain.localusd.cloud/tx/${signature}`,
+            explorerUrl: explorerTxUrl(signature),
           }
           const message = buildTxMessage(txEntry, wallet.name, wallet.address, contact?.name)
           void sendWebhook(prefs.webhookBotToken, prefs.webhookTopicUrl, message).then((result) => {
@@ -1358,7 +1359,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             status: 'success',
             memo: params.memo || '',
             counterparty: params.to.trim(),
-            explorerUrl: `https://chain.localusd.cloud/tx/${signature}`,
+            explorerUrl: explorerTxUrl(signature),
           }
           const message = buildTxMessage(txEntry, wallet.name, wallet.address, contact?.name)
           void sendWebhook(prefs.webhookBotToken, prefs.webhookTopicUrl, message).then((result) => {
