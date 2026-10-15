@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
-import { BookUser, Check, Pencil, Plus, Star, Trash2, X } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { BookUser, Check, Download, Pencil, Plus, Star, Trash2, Upload, X } from 'lucide-react'
 import { useWallet } from '../state/WalletProvider'
 import { Contact } from '../state/vault'
 import { isValidAddress, shortAddress } from '../lib/crypto'
-import { copyToClipboard } from '../lib/format'
+import { copyToClipboard, downloadTextFile } from '../lib/format'
 import { isTelegramWebApp } from '../lib/telegram'
 
 const emptyDraft = { name: '', address: '', note: '' }
@@ -13,6 +13,7 @@ export default function ContactsPanel() {
   const [draft, setDraft] = useState(emptyDraft)
   const [editing, setEditing] = useState<Contact | null>(null)
   const [open, setOpen] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const suggestions = useMemo(() => {
     const known = new Set(contacts.map((contact) => contact.address))
@@ -64,6 +65,54 @@ export default function ContactsPanel() {
     )
   }
 
+  const exportContacts = () => {
+    if (contacts.length === 0) {
+      pushToast({ tone: 'info', title: 'Danh bạ trống, không có gì để tải xuống' })
+      return
+    }
+    downloadTextFile(`danh-ba-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(contacts, null, 2))
+    pushToast({ tone: 'success', title: `Đã tải xuống ${contacts.length} liên hệ` })
+  }
+
+  const importContacts = async (file: File) => {
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text)
+      if (!Array.isArray(parsed)) {
+        pushToast({ tone: 'error', title: 'File không hợp lệ: không phải danh sách danh bạ' })
+        return
+      }
+      const validContacts: Contact[] = parsed
+        .filter((item: any) => item && typeof item.name === 'string' && typeof item.address === 'string' && isValidAddress(item.address))
+        .map((item: any) => ({
+          id: item.id || `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name: item.name.trim(),
+          address: item.address.trim(),
+          note: item.note || '',
+          createdAt: item.createdAt || Date.now(),
+          favorite: item.favorite || false,
+        }))
+      if (validContacts.length === 0) {
+        pushToast({ tone: 'error', title: 'Không tìm thấy liên hệ hợp lệ trong file' })
+        return
+      }
+      const existingAddresses = new Set(contacts.map((c) => c.address))
+      const merged = [...contacts]
+      let added = 0
+      for (const contact of validContacts) {
+        if (!existingAddresses.has(contact.address)) {
+          merged.push(contact)
+          existingAddresses.add(contact.address)
+          added++
+        }
+      }
+      await saveContacts(merged)
+      pushToast({ tone: 'success', title: `Đã nhập ${added} liên hệ mới (${validContacts.length - added} trùng)` })
+    } catch {
+      pushToast({ tone: 'error', title: 'Không thể đọc file danh bạ' })
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -71,18 +120,47 @@ export default function ContactsPanel() {
           <BookUser size={17} className="accent-text" />
           <h2 className="text-[15px] font-semibold">Danh bạ địa chỉ</h2>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setEditing(null)
-            setDraft(emptyDraft)
-            setOpen((value) => !value)
-          }}
-          className="flex items-center gap-1.5 rounded-2xl accent-gradient px-3.5 py-2 text-[12.5px] font-semibold text-white shadow-glow"
-        >
-          {open ? <X size={14} /> : <Plus size={14} />}
-          {open ? 'Đóng' : 'Thêm'}
-        </button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importContacts(file)
+              e.target.value = ''
+            }}
+          />
+          <button
+            type="button"
+            title="Tải xuống danh bạ"
+            onClick={exportContacts}
+            className="flex items-center gap-1.5 rounded-2xl border border-[color:var(--border)] px-3 py-2 text-[12.5px] font-semibold transition hover:bg-[color:var(--surface)]"
+          >
+            <Download size={14} />
+          </button>
+          <button
+            type="button"
+            title="Tải lên danh bạ"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 rounded-2xl border border-[color:var(--border)] px-3 py-2 text-[12.5px] font-semibold transition hover:bg-[color:var(--surface)]"
+          >
+            <Upload size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditing(null)
+              setDraft(emptyDraft)
+              setOpen((value) => !value)
+            }}
+            className="flex items-center gap-1.5 rounded-2xl accent-gradient px-3.5 py-2 text-[12.5px] font-semibold text-white shadow-glow"
+          >
+            {open ? <X size={14} /> : <Plus size={14} />}
+            {open ? 'Đóng' : 'Thêm'}
+          </button>
+        </div>
       </div>
 
       {open && (
