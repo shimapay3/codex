@@ -1,6 +1,6 @@
 import { rpcMethod, sanitizeRpcUrl, DEFAULT_RPC } from './rpc.mjs'
 import { getState } from './store.mjs'
-import { getUserCloudTxHistory } from './explorer.mjs'
+import { getUserCloudTxHistory, getCloudTxsForAddress } from './explorer.mjs'
 
 /**
  * Unified sync endpoint — the single realtime API the client polls every 5 s.
@@ -19,7 +19,7 @@ const USDC_MINT = 'USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2'
 const TOKEN_2022 = 'TokenzQdBNbLqP5VEhPkASv1L5Xuo6YHuHD4qLm9Q'
 
 const EXPLORER_BASE = 'https://chain.localusd.cloud'
-const EXPLORER_CUSTOM_URL = 'https://localusd.cloud/'
+const EXPLORER_CUSTOM_URL = 'https://rpc.localusd.cloud'
 
 function explorerTxUrl(signature) {
   const params = new URLSearchParams({ cluster: 'custom', customUrl: EXPLORER_CUSTOM_URL })
@@ -270,10 +270,22 @@ export async function handleSync(req, res) {
       if (cloudTxs.length > 0) {
         transactions = cloudTxs.slice(0, 15)
       } else {
-        transactions = await fetchRecentTxs(rpcUrl, address, 15)
+        // Fallback: check txIndex by address (populated even if user txHistory is empty)
+        const indexTxs = getCloudTxsForAddress(address)
+        if (indexTxs.length > 0) {
+          transactions = indexTxs.slice(0, 15)
+        } else {
+          transactions = await fetchRecentTxs(rpcUrl, address, 15)
+        }
       }
     } else {
-      transactions = await fetchRecentTxs(rpcUrl, address, 15)
+      // No telegramId — try txIndex by address first, then RPC
+      const indexTxs = getCloudTxsForAddress(address)
+      if (indexTxs.length > 0) {
+        transactions = indexTxs.slice(0, 15)
+      } else {
+        transactions = await fetchRecentTxs(rpcUrl, address, 15)
+      }
     }
 
     const [usdc, sol, price] = await Promise.all([

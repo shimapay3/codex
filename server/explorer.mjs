@@ -76,7 +76,7 @@ async function fetchUsdcBalance(rpcUrl, owner) {
   }
 }
 
-function getCloudTxsForAddress(address) {
+export function getCloudTxsForAddress(address) {
   const state = getState()
   const txIndex = state.txIndex || { byAddress: {}, bySignature: {} }
   const sigs = txIndex.byAddress[address] || []
