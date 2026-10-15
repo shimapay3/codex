@@ -5,6 +5,11 @@ import { TxEntry, formatAmount } from '../lib/solana'
 import { splitMemo } from '../lib/categories'
 import TxList, { TxDetail } from '../components/TxList'
 
+/** Strip all non-digit characters so searching "5.000" or "5,000" or "+5000" all match raw "5000". */
+function digitsOnly(value: string): string {
+  return value.replace(/[^0-9]/g, '')
+}
+
 type FilterId = 'all' | 'in' | 'out' | 'failed'
 
 const FILTERS: { id: FilterId; label: string }[] = [
@@ -15,24 +20,41 @@ const FILTERS: { id: FilterId; label: string }[] = [
 ]
 
 export default function HistoryPage() {
-  const { history, historyLoading, refresh, activeWallet } = useWallet()
+  const { history, historyLoading, refresh, activeWallet, contacts, txMeta } = useWallet()
   const [filter, setFilter] = useState<FilterId>('all')
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<TxEntry | null>(null)
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
+    const termDigits = digitsOnly(term)
     return history.filter((entry) => {
       if (filter === 'failed' && entry.status !== 'failed') return false
       if (filter !== 'failed' && filter !== 'all' && entry.direction !== filter) return false
       if (!term) return true
-      return (
+      // MEMO, signature, counterparty address
+      if (
         entry.memo.toLowerCase().includes(term) ||
         entry.signature.toLowerCase().includes(term) ||
         (entry.counterparty || '').toLowerCase().includes(term)
-      )
+      ) return true
+      // Amount / balance — ignore currency formatting and +/- signs
+      if (termDigits && digitsOnly(String(entry.amount)).includes(termDigits)) return true
+      // Contact name and contact annotation (note)
+      const contact = entry.counterparty ? contacts.find((c) => c.address === entry.counterparty) : null
+      if (contact) {
+        if (contact.name.toLowerCase().includes(term)) return true
+        if (contact.note && contact.note.toLowerCase().includes(term)) return true
+      }
+      // TxMeta: counterparty label and note
+      const meta = txMeta[entry.signature]
+      if (meta) {
+        if (meta.counterpartyLabel && meta.counterpartyLabel.toLowerCase().includes(term)) return true
+        if (meta.note && meta.note.toLowerCase().includes(term)) return true
+      }
+      return false
     })
-  }, [history, filter, query])
+  }, [history, filter, query, contacts, txMeta])
 
   const totals = useMemo(() => {
     const incoming = history
@@ -135,7 +157,7 @@ export default function HistoryPage() {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Tìm theo MEMO, địa chỉ hoặc chữ ký"
+          placeholder="Tìm theo số tiền, MEMO, danh bạ hoặc chữ ký"
           className="w-full bg-transparent py-3 text-[12.5px] outline-none"
         />
       </div>
