@@ -179,7 +179,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
       <Section
         icon={<Gauge size={15} />}
         title="Giá USDC"
-        hint="USDC là stablecoin nên mặc định ≈ 1 USD · ≈ 30.000 ₫. Để trống để dùng tỷ giá cố định; hoặc trỏ tới một RPC/price endpoint trả JSON."
+        hint="USDC là stablecoin nên mặc định ≈ 1 USD · ≈ 30.000 (₫/∞). Để trống để dùng tỷ giá cố định; hoặc trỏ tới một RPC/price endpoint trả JSON."
       >
         <div className="flex items-center justify-between rounded-2xl bg-[color:var(--surface)] px-3.5 py-3">
           <span className="text-[12px] text-[color:var(--muted)]">Tỷ giá đang dùng</span>

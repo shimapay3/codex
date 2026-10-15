@@ -125,7 +125,7 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
                 />
                 <div>
                   <p className="text-[14px] font-semibold">Chỉ USDC — đã xác minh</p>
-                  <p className="text-[11px] text-[color:var(--muted)]">≈ 1 USD · ≈ 30.000 ₫</p>
+                  <p className="text-[11px] text-[color:var(--muted)]">≈ 1 USD · ≈ 30.000 (₫/∞)</p>
                 </div>
               </div>
               <p className="font-mono text-[10px] break-all text-[color:var(--muted)]">{USDC_MINT}</p>

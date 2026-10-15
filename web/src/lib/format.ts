@@ -27,7 +27,7 @@ export function formatUsd(value: number): string {
 }
 
 export function formatVnd(value: number): string {
-  return `${Math.round(value).toLocaleString('vi-VN')} ₫`
+  return `${Math.round(value).toLocaleString('vi-VN')} (₫/∞)`
 }
 
 export function copyToClipboard(value: string): Promise<void> {
