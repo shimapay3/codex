@@ -28,7 +28,7 @@ type Step = 'welcome' | 'method' | 'import' | 'restore' | 'secure'
 export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
   const { createWallet, setPin, wallets, pushToast, completeOnboarding, telegramUser, exportSecrets } =
     useWallet()
-  const [step, setStep] = useState<Step>('welcome')
+  const [step, setStep] = useState<Step>(wallets.length ? 'secure' : 'welcome')
   const [secret, setSecret] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -273,10 +273,10 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
                 disabled={busy || !secret.trim()}
                 onClick={() =>
                   run(async () => {
-                    await createWallet(secret, 'Ví của tôi')
+                    const wallet = await createWallet(secret, 'Ví của tôi')
                     // Check SOL balance after import — warn if insufficient
                     try {
-                      const sol = await getSolBalance(DEFAULT_RPC_URL, (await import('../lib/crypto')).importSecret(secret).then(r => r.keypair.publicKey.toBase58()).catch(() => ''))
+                      const sol = await getSolBalance(DEFAULT_RPC_URL, wallet.address)
                       if (sol < 0.05) {
                         setSolWarning(`Ví chỉ có ${sol.toFixed(6)} SOL — không đủ phí gas. Mở trong Telegram để nhận airdrop SOL.`)
                       }
@@ -366,8 +366,9 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
                     downloadTextFile(
                       `cloudpay-${shortAddress(wallet.address, 4)}.json`,
                       data,
+                      'application/json',
+                      true,
                     )
-                    pushToast({ tone: 'info', title: 'Đã tải khoá bí mật' })
                   } catch (error: any) {
                     pushToast({ tone: 'error', title: 'Không tải được', body: error?.message })
                   }
@@ -389,14 +390,14 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
               onClick={() => completeOnboarding()}
               className="w-full rounded-2xl py-3 text-[13px] font-semibold text-[color:var(--muted)] transition hover:text-[color:var(--accent)]"
             >
-              Bỏ qua — tôi sẽ tự lưu khoá bí mật
+              Đã backup — tiếp tục không đặt PIN
             </button>
           </div>
         )}
       </div>
 
       <p className="mt-4 text-center text-[12.5px] font-semibold text-[color:var(--muted)]">
-        {wallets.length ? 'Đã tạo ví — bảo vệ khoá hoặc bỏ qua để tiếp tục' : 'Hãy tạo hoặc nhập một ví để tiếp tục'}
+        {wallets.length ? 'Đã kiểm tra backup — thiết lập bảo vệ để tiếp tục' : 'Hãy tạo hoặc nhập một ví để tiếp tục'}
       </p>
     </div>
   )

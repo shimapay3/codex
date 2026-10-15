@@ -124,6 +124,21 @@ button {
   color: inherit;
 }
 
+.file-export-dialog {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.file-export-dialog::backdrop {
+  background: var(--overlay-blur);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.file-export-dialog :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 input::placeholder,
 textarea::placeholder {
   color: var(--muted);

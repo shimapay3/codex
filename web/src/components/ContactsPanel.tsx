@@ -70,8 +70,7 @@ export default function ContactsPanel() {
       pushToast({ tone: 'info', title: 'Danh bạ trống, không có gì để tải xuống' })
       return
     }
-    downloadTextFile(`danh-ba-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(contacts, null, 2))
-    pushToast({ tone: 'success', title: `Đã tải xuống ${contacts.length} liên hệ` })
+    void downloadTextFile(`danh-ba-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(contacts, null, 2))
   }
 
   const importContacts = async (file: File) => {

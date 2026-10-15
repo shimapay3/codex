@@ -9,6 +9,8 @@ import Logo from './components/Logo'
 import TelegramGuide from './components/TelegramGuide'
 import { primeAudio } from './lib/notify'
 import { isTelegramWebApp } from './lib/telegram'
+import FileExportDialog from './components/FileExportDialog'
+import WalletBackupGate from './components/WalletBackupGate'
 
 function BootScreen() {
   return (
@@ -25,7 +27,8 @@ function BootScreen() {
 }
 
 export default function App() {
-  const { session } = useWallet()
+  const { session, wallets } = useWallet()
+  const pendingBackup = wallets.find((wallet) => wallet.backupRequired)
   const inTelegram = isTelegramWebApp()
 
   // The first gesture anywhere unlocks audio so payment chimes can ring later.
@@ -37,11 +40,16 @@ export default function App() {
 
   if (session === 'booting') return <BootScreen />
 
+  if (session !== 'locked' && pendingBackup) {
+    return <><WalletBackupGate key={pendingBackup.id} wallet={pendingBackup} /><FileExportDialog /></>
+  }
+
   if (session === 'onboarding') {
     return (
       <>
         <SpaceBackdrop />
         <Onboarding inTelegram={inTelegram} />
+        <FileExportDialog />
         <Toasts />
       </>
     )
@@ -57,5 +65,5 @@ export default function App() {
     )
   }
 
-  return <Shell />
+  return <><Shell /><FileExportDialog /></>
 }

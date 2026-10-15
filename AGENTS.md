@@ -60,6 +60,15 @@ Verify with `docker compose -f docker-compose.base44.yml ps` and `curl -s localh
 - Icons are pre-rendered PNGs in `web/public/icons/` (iOS ignores SVG for `apple-touch-icon`). The
   source mark is `web/public/logo.svg`; regenerate with sharp if the mark changes.
 
+## Reset and verified file backups
+
+- Device reset must remove `cloudpay.vault.v1`, not just the PIN. `clearDeviceData` removes all app-prefixed local/session storage except the stable device ID, so clearing a vault does not bypass server wallet/airdrop limits. It does not delete cloud contacts or on-chain funds. The same confirmation is available from Settings and the locked screen; reset clears decrypted state and returns directly to onboarding.
+- New/imported wallets carry `backupRequired: true` inside the encrypted vault. `App` gates onboarding/Home until `WalletBackupGate` completes a verified file export and the user accepts the loss-of-funds warning. Legacy wallets without this flag are unchanged. Reload/unlock must retain the pending gate. Do not mark a backup complete just because an anchor was clicked or a share sheet closed.
+- `downloadTextFile` now returns `Promise<boolean>` via an in-memory export request and `FileExportDialog`. True means matching file contents were read back (native save picker or the user's selected saved file). Share Sheet sends a real `File`; on iOS use **Save to Files**, never a Telegram bot/public download URL for secrets. Browser downloads are only requests until verified; cancellation/copying is not backup proof. No plaintext backup is sent to the API or persisted by this exporter.
+- Verification covered real downloaded files for backups (including a passphrase-derived wallet), contacts and address text in isolated Chromium and WebKit/iPhone-layout contexts. Those tests stub peripheral wallet-registration/RPC responses to avoid real airdrops, transfers or server records, but use the real forms, encrypted local vault, download manager and file picker inputs. Native OS save/share dialogs still require a physical-device check; WebKit emulation is not actual iOS Safari. Long chained WebKit tests with multiple downloads crashed on same-tab reload after Settings reset; opening a new tab passed, and a focused locked-screen reset + reload passed in both engines. Do not claim this anomaly is resolved.
+- `npm run build` passes. `npx tsc --noEmit` has existing `BufferSource`/typed-array errors in crypto/passkey code; the build does not run the type checker.
+- `deploy-vps.sh` runs frontend/server installs from lockfiles and uses remote `pipefail` so a failed build cannot be hidden by `tail`. Production is the existing VPS deployment, separate from the Base44 sandbox.
+
 ## Sandbox-only overrides
 
 - `web/vite.config.ts` appends `.${BASE44_SANDBOX_HOST_DOMAIN}` to Vite's `allowedHosts` **only when

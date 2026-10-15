@@ -30,10 +30,10 @@ tar czf - \
   . | $SSH_BASE "mkdir -p $REMOTE_DIR && tar xzf - -C $REMOTE_DIR"
 
 echo "==> Installing server dependencies ..."
-$SSH_BASE "cd $REMOTE_DIR/server && npm install --omit=dev 2>&1 | tail -3"
+$SSH_BASE "set -euo pipefail; cd $REMOTE_DIR/server; npm ci --omit=dev 2>&1 | tail -3"
 
 echo "==> Building frontend ..."
-$SSH_BASE "cd $REMOTE_DIR/web && npm install 2>&1 | tail -3 && npm run build 2>&1 | tail -5"
+$SSH_BASE "set -euo pipefail; cd $REMOTE_DIR/web; npm ci 2>&1 | tail -3; npm run build 2>&1 | tail -5"
 
 echo "==> Fixing permissions for nginx ..."
 $SSH_BASE "chmod o+x /root /root/dev /root/dev/payproject /root/dev/payproject/web /root/dev/payproject/web/dist && chmod -R o+r /root/dev/payproject/web/dist && find /root/dev/payproject/web/dist -type d -exec chmod o+x {} \;"

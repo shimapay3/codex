@@ -28,6 +28,17 @@ export function removeLocal(key: string) {
   }
 }
 
+/** Clear app data without touching other apps or resetting the anti-abuse device identity. */
+export function clearDeviceData() {
+  const deviceKey = PREFIX + StorageKeys.deviceId
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith(PREFIX) && key !== deviceKey) localStorage.removeItem(key)
+  }
+  for (const key of Object.keys(sessionStorage)) {
+    if (key.startsWith(PREFIX)) sessionStorage.removeItem(key)
+  }
+}
+
 export const StorageKeys = {
   vault: 'vault.v1',
   passkey: 'passkey.v1',

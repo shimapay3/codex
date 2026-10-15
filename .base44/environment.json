@@ -2,5 +2,11 @@
   "previewPort": 3000,
   "healthPath": "/",
   "startCommand": "docker compose -f docker-compose.base44.yml up -d",
-  "secrets": []
+  "secrets": [
+    {
+      "name": "VPS_SSH_PASSWORD",
+      "description": "SSH password for the existing VPS, used only by deploy-vps.sh (not required by app services)",
+      "requiredAtBoot": false
+    }
+  ]
 }

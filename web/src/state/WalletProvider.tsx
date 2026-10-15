@@ -39,7 +39,8 @@ import {
 } from '../lib/notify'
 import { applyTheme } from '../lib/theme'
 import { sendWebhook, buildTxMessage, markWebhookSent, isWebhookSent } from '../lib/webhook'
-import { readLocal, writeLocal, removeLocal, StorageKeys, getOrCreateDeviceId } from '../lib/storage'
+import { readLocal, writeLocal, removeLocal, clearDeviceData, StorageKeys, getOrCreateDeviceId } from '../lib/storage'
+import { finishFileExport } from '../lib/fileExport'
 import { getTelegramUser, getTelegramUserIdString, telegramReady, isTelegramWebApp, type TelegramUser } from '../lib/telegram'
 import { useRealtimePoll, type SyncResponse } from './useRealtimePoll'
 import { useAutoLock } from './useAutoLock'
@@ -160,6 +161,8 @@ type WalletContextValue = {
   clearPin: () => Promise<void>
   lock: () => void
   completeOnboarding: () => void
+  confirmWalletBackup: (walletId: string) => Promise<void>
+  resetDevice: () => void
   extendAutoLock: () => void
   pushToast: (toast: Omit<Toast, 'id' | 'createdAt'>) => void
   dismissToast: (id: string) => void
@@ -507,6 +510,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         secret: result.canonicalSecret,
         createdAt: Date.now(),
         tone: toneForIndex(currentVault.wallets.length),
+        backupRequired: true,
       }
 
       const wrap = await buildKeyWrap(wallet.id, Uint8Array.from(wallet.secret), currentKey)
@@ -588,6 +592,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           secret: result.canonicalSecret,
           createdAt: Date.now(),
           tone: toneForIndex(0),
+          backupRequired: true,
         }
         const data = emptyVault(loadPrefsMirror())
         data.wallets = [wallet]
@@ -1117,6 +1122,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // --- auto lock ------------------------------------------------------------
   const lock = useCallback(() => {
+    finishFileExport(false)
     vaultKeyRef.current = null
     setVault(null)
     vaultRef.current = null
@@ -1127,7 +1133,37 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setSession('locked')
   }, [])
 
+  const confirmWalletBackup = useCallback(async (walletId: string) => {
+    const current = vaultRef.current
+    if (!current) throw new Error('Ví đang bị khoá')
+    await persist({ ...current, wallets: current.wallets.map((wallet) => wallet.id === walletId ? { ...wallet, backupRequired: false } : wallet) })
+  }, [persist])
+
+  const resetDevice = useCallback(() => {
+    // Remove the vault too, not just its PIN. No stale wrap can force the lock screen again.
+    clearDeviceData()
+    finishFileExport(false)
+    vaultKeyRef.current?.fill(0)
+    vaultKeyRef.current = null
+    vaultRef.current = null
+    seenRef.current = new Set()
+    lastCloudUpdateRef.current = null
+    lastAirdropStatusRef.current = 'idle'
+    setVault(null)
+    setStore(null)
+    setPinEnabled(false)
+    setHistory([])
+    setHistoryLoading(false)
+    setBalance({ usdc: 0, sol: 0, decimals: USDC_DECIMALS_FALLBACK, loading: false })
+    setLastPayment(null)
+    setAirdrop({ status: 'idle', payserver: null, signature: null, error: null })
+    setToasts([])
+    setPrefsState({ ...DEFAULT_PREFS })
+    setSession('onboarding')
+  }, [])
+
   const completeOnboarding = useCallback(() => {
+    if (vaultRef.current?.wallets.some((wallet) => wallet.backupRequired)) return
     setSession('unlocked')
   }, [])
 
@@ -1365,6 +1401,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     clearPin,
     lock,
     completeOnboarding,
+    confirmWalletBackup,
+    resetDevice,
     extendAutoLock: extend,
     pushToast,
     dismissToast,

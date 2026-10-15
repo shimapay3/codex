@@ -20,6 +20,8 @@ export type WalletRecord = {
   secret: number[]
   createdAt: number
   tone: string
+  /** New wallets cannot enter the app until their local backup is verified. */
+  backupRequired?: boolean
 }
 
 export type Contact = {

@@ -11,6 +11,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import Logo from './Logo'
+import DeviceResetButton from './DeviceResetButton'
 import SecretUpload from './SecretUpload'
 import { useWallet } from '../state/WalletProvider'
 import { shortAddress } from '../lib/crypto'
@@ -249,6 +250,10 @@ export default function LockScreen() {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="mt-6 w-full">
+        <DeviceResetButton label="Xoá dữ liệu & bắt đầu lại" />
       </div>
 
       <p className="mt-6 text-center text-[10.5px] leading-relaxed text-[color:var(--muted)]">

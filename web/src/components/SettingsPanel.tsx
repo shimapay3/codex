@@ -18,7 +18,6 @@ import {
   Send,
   ShieldAlert,
   ShieldCheck,
-  Trash2,
   Volume2,
   Webhook,
 } from 'lucide-react'
@@ -28,9 +27,9 @@ import { DEFAULT_RPC_URL, rpcFetch } from '../lib/solana'
 import { copyToClipboard, downloadTextFile, formatVnd } from '../lib/format'
 import { notificationsSupported, primeAudio, requestNotificationPermission, ringIncoming } from '../lib/notify'
 import { shortAddress } from '../lib/crypto'
-import { removeLocal } from '../lib/storage'
 import { isTelegramWebApp, TELEGRAM_LOGO } from '../lib/telegram'
 import { useTelegramProfile } from '../state/useTelegramProfile'
+import DeviceResetButton from './DeviceResetButton'
 
 const LOCK_OPTIONS = [5, 10, 15, 20]
 
@@ -115,7 +114,6 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
   const [pinDraft, setPinDraft] = useState('')
   const [showPin, setShowPin] = useState(false)
   const [revealed, setRevealed] = useState<string | null>(null)
-  const [confirmReset, setConfirmReset] = useState(false)
   const [tokenDraft, setTokenDraft] = useState(prefs.webhookBotToken)
   const [topicDraft, setTopicDraft] = useState(prefs.webhookTopicUrl)
   const [showToken, setShowToken] = useState(false)
@@ -493,8 +491,9 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
                     downloadTextFile(
                       `cloudpay-${shortAddress(wallet.address, 4)}.json`,
                       exportSecrets(wallet.id),
+                      'application/json',
+                      true,
                     )
-                    toast({ tone: 'info', title: 'Đã tải khoá bí mật' })
                   } catch (error: any) {
                     toast({ tone: 'error', title: 'Không tải được', body: error?.message })
                   }
@@ -527,35 +526,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
         <Row label="Telegram ID">
           <span className="text-[12.5px] font-semibold">{tgId || '—'}</span>
         </Row>
-        <button
-          type="button"
-          onClick={() => setConfirmReset((value) => !value)}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[#ff6b81]/40 py-3 text-[13px] font-semibold text-[#ff8fa1]"
-        >
-          <Trash2 size={15} /> Xoá dữ liệu trên thiết bị
-        </button>
-        {confirmReset && (
-          <div className="space-y-2 rounded-2xl border border-[#ff6b81]/40 bg-[#ff6b81]/10 p-3">
-            <p className="text-[11.5px] leading-relaxed text-[#ff8fa1]">
-              Toàn bộ cài đặt, PIN và danh bạ trên thiết bị sẽ bị xoá.
-              <b className="block mt-1">⚠ Khoá bí mật (keypair/private key) sẽ được GIỮ LẠI trong localStorage</b> — bạn vẫn có thể mở ví bằng khoá bí mật. Hãy chắc chắn đã backup khoá trước khi xoá PIN.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                removeLocal('pin.v1')
-                removeLocal('pinEnabled.v1')
-                removeLocal('pinAttempts.v1')
-                removeLocal('localdata.v1')
-                removeLocal('prefs.v1')
-                window.location.assign('/')
-              }}
-              className="w-full rounded-2xl bg-[#ff6b81] py-3 text-[13px] font-semibold text-white"
-            >
-              Tôi hiểu — xoá cài đặt
-            </button>
-          </div>
-        )}
+        <DeviceResetButton />
       </Section>
 
       {!isTelegramWebApp() && (
