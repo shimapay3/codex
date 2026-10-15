@@ -91,6 +91,38 @@ async function lookupAddress(rpcUrl: string, address: string): Promise<AddressRe
 }
 
 async function lookupTx(rpcUrl: string, signature: string): Promise<TxResult> {
+  // 1. Try cloud DB API first (checks txIndex, then falls back to RPC server-side)
+  try {
+    const res = await fetch(
+      `/api/explorer/tx/${encodeURIComponent(signature)}?rpc=${encodeURIComponent(rpcUrl)}`,
+    )
+    if (res.ok) {
+      const data = await res.json()
+      if (data && data.signature) {
+        return {
+          type: 'tx',
+          signature: data.signature,
+          slot: data.slot || 0,
+          blockTime: data.blockTime ?? null,
+          fee: data.fee ?? 0,
+          status: (data.status as 'success' | 'failed') || 'success',
+          memo: data.memo || '',
+          tokenTransfers: (data.tokenTransfers || []).map((t: any) => ({
+            amount: t.amount,
+            decimals: t.decimals,
+            from: t.from,
+            to: t.to,
+            mint: t.mint,
+          })),
+          solTransfers: data.solTransfers || [],
+        }
+      }
+    }
+  } catch {
+    /* fall through to direct RPC */
+  }
+
+  // 2. Fallback: direct RPC lookup
   const tx = await rpcFetch<any>(
     rpcUrl,
     'getTransaction',

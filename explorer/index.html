@@ -195,7 +195,7 @@
             const icon = tx.tokenSymbol === 'SOL' ? SOL_ICON : USDC_ICON
             return `
               <div class="tx-item" onclick="navigate('/tx/${tx.signature}')">
-                <div class="tx-dir ${isIn ? 'in' : 'out'}">${isIn ? '↓' : '↑'}</div>
+                <div class="tx-dir ${isIn ? 'in' : 'out'}">${isIn ? '↑' : '↓'}</div>
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;align-items:center;gap:0.4rem">
                     <img src="${icon}" style="width:16px;height:16px;border-radius:50%" onerror="this.src='${SOL_ICON}'">
