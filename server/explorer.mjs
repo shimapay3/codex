@@ -27,32 +27,19 @@ function lamportsToSol(lamports) {
 }
 
 /**
- * Chuẩn hoá số tiền USDC trong bản ghi cloud.
- * Cloud Chain USDC dùng 9 decimals.  Một số bản ghi cũ bị sai:
- *  - decimals=6 (fallback) + amount=raw/10^6  → chia tiếp 1000 để ra raw/10^9
- *  - decimals=9 + amount=raw (chưa chia)       → chia 10^9
- *  - decimals=6 + amount đã đúng (human)      → chỉ sửa decimals thành 9
- *
- * Heuristic: chỉ re-normalise khi amount là số nguyên > 100 (raw/10^6 luôn
- * nguyên) — tránh phá giá trị human-readable nhỏ.
+ * Chuẩn hoá decimals cho bản ghi cloud USDC.
+ * Cloud Chain USDC luôn dùng 9 decimals.  Chỉ sửa trường decimals,
+ * KHÔNG chia amount — amount đã là human-readable khi lưu qua pushCloudTx
+ * (frontend gửi params.amount trực tiếp).  Heuristic chia amount cũ đã
+ * phá giá trị hợp lệ lớn (vd 3,000,000,000 USDC → 3).
  */
 export function normalizeCloudTxAmount(tx) {
   if (!tx) return tx
   const isSol = tx.tokenSymbol === 'SOL'
   if (!isSol && tx.decimals != null && tx.decimals !== USDC_DECIMALS) {
-    const oldDec = tx.decimals
-    if (Number.isInteger(tx.amount) && tx.amount > 100) {
-      // amount = raw / 10^oldDec → correct = raw / 10^9
-      const raw = tx.amount * Math.pow(10, oldDec)
-      tx.amount = raw / Math.pow(10, USDC_DECIMALS)
-    }
     tx.decimals = USDC_DECIMALS
   } else if (!isSol && tx.decimals == null) {
     tx.decimals = USDC_DECIMALS
-  }
-  // Trường hợp amount vẫn là raw (rất lớn) dù decimals=9
-  if (!isSol && tx.decimals === USDC_DECIMALS && tx.amount > 1_000_000 && Number.isInteger(tx.amount)) {
-    tx.amount = tx.amount / Math.pow(10, USDC_DECIMALS)
   }
   return tx
 }
