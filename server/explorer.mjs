@@ -184,11 +184,25 @@ export async function handleExplorerAddress(req, res) {
   const rpcUrl = sanitizeRpcUrl(req.query.rpc) || DEFAULT_RPC
 
   try {
-    const [sol, usdc, transactions] = await Promise.all([
+    const [sol, usdc, rawTxs] = await Promise.all([
       fetchSolBalance(rpcUrl, address),
       fetchUsdcBalance(rpcUrl, address),
       Promise.resolve(getCloudTxsForAddress(address)),
     ])
+
+    // Adjust direction relative to the queried address:
+    // - walletAddress === address → 'out' (this address sent)
+    // - counterparty  === address → 'in'  (this address received)
+    const transactions = rawTxs.slice(0, 50).map((tx) => {
+      if (tx.counterparty === address && tx.walletAddress !== address) {
+        // Viewing from receiver's perspective: counterparty = sender
+        return { ...tx, direction: 'in', counterparty: tx.walletAddress }
+      }
+      if (tx.walletAddress === address && tx.counterparty !== address) {
+        return { ...tx, direction: 'out' }
+      }
+      return tx
+    })
 
     res.json({
       address,
@@ -197,8 +211,8 @@ export async function handleExplorerAddress(req, res) {
         { symbol: 'SOL', balance: sol, decimals: 9, icon: SOL_ICON, mint: null },
         { symbol: 'USDC', balance: usdc.amount, decimals: usdc.decimals, icon: USDC_ICON, mint: USDC_MINT },
       ],
-      transactions: transactions.slice(0, 50),
-      txCount: transactions.length,
+      transactions,
+      txCount: rawTxs.length,
     })
   } catch (err) {
     res.status(500).json({ error: 'Lookup failed', detail: err?.message })

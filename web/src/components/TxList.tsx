@@ -35,7 +35,14 @@ export function TxRow({ entry, onSelect }: { entry: TxEntry; onSelect: (entry: T
   const meta = txMeta[entry.signature]
   const parsed = splitMemo(entry.memo)
   const category = parsed.category
-  const color = meta?.category ? undefined : category.color
+  const dirColor =
+    entry.status === 'failed'
+      ? '#ff4d6d'
+      : entry.direction === 'in'
+        ? '#22e07a'
+        : entry.direction === 'out'
+          ? 'var(--accent)'
+          : category.color
   const label = parsed.title || meta?.wish || category.label
   const contact = entry.counterparty ? contacts.find((c) => c.address === entry.counterparty) : null
   const [webhookSent, setWebhookSent] = useState(() => isWebhookSent(entry.signature))
@@ -57,8 +64,8 @@ export function TxRow({ entry, onSelect }: { entry: TxEntry; onSelect: (entry: T
       <span
         className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[17px]"
         style={{
-          background: `color-mix(in srgb, ${color || category.color} 22%, transparent)`,
-          border: `1px solid color-mix(in srgb, ${color || category.color} 42%, transparent)`,
+          background: `color-mix(in srgb, ${dirColor} 22%, transparent)`,
+          border: `1px solid color-mix(in srgb, ${dirColor} 42%, transparent)`,
         }}
       >
         {entry.direction === 'in' ? (
