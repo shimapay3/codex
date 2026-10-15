@@ -50,6 +50,35 @@ export function copyToClipboard(value: string): Promise<void> {
 export function downloadTextFile(filename: string, content: string, mime = 'application/json') {
   const blob = new Blob([content], { type: mime })
   const url = URL.createObjectURL(blob)
+  const escaped = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  // Try popup approach — works in restricted browsers / Telegram WebView
+  const popup = window.open('', '_blank')
+  if (popup) {
+    popup.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${filename}</title>
+      <style>
+        body{font-family:system-ui,-apple-system,sans-serif;padding:24px;max-width:600px;margin:0 auto;text-align:center}
+        .btn{display:inline-block;padding:12px 28px;border-radius:12px;background:#22e07a;color:#fff;text-decoration:none;font-weight:600;font-size:15px;margin:12px 0}
+        textarea{width:100%;height:200px;margin-top:12px;font-size:11px;font-family:monospace;border:1px solid #ddd;border-radius:8px;padding:8px;resize:vertical}
+        p{color:#666;font-size:13px}
+      </style></head><body>
+      <h3>📄 ${filename}</h3>
+      <a class="btn" href="${url}" download="${filename}">⬇ Tải xuống file</a>
+      <p>Nếu nút trên không hoạt động, hãy sao chép nội dung bên dưới:</p>
+      <textarea readonly onclick="this.select()">${escaped}</textarea>
+      </body></html>`)
+    popup.document.close()
+    // Auto-trigger download in popup
+    const link = popup.document.createElement('a')
+    link.href = url
+    link.download = filename
+    popup.document.body.appendChild(link)
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 30000)
+    return
+  }
+
+  // Fallback: in-page download
   const link = document.createElement('a')
   link.href = url
   link.download = filename
