@@ -78,7 +78,6 @@ export function buildTxMessage(
     `<b>Thời gian:</b> ${time}`,
     `<b>Slot:</b> ${entry.slot}`,
     `<b>Chữ ký:</b> <code>${entry.signature}</code>`,
-    `<b>Explorer:</b> ${entry.explorerUrl}`,
   ]
     .filter(Boolean)
     .join('\n')
