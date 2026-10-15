@@ -195,8 +195,8 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
             {
               label: 'Phí SOL',
               value: entry.fee != null && entry.fee > 0
-                ? `◎${entry.fee.toFixed(9)} SOL`
-                : '◎0.000005 SOL (ước tính)',
+                ? `◎${entry.fee.toLocaleString('vi-VN', { minimumFractionDigits: 9, maximumFractionDigits: 9 })} SOL`
+                : '◎0,000005 SOL (ước tính)',
             },
             {
               label: entry.direction === 'in' ? 'Từ' : 'Đến',

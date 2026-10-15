@@ -182,7 +182,7 @@ export default function SettingsPanel({ onOpenTheme }: { onOpenTheme: () => void
         <div className="flex items-center justify-between rounded-2xl bg-[color:var(--surface)] px-3.5 py-3">
           <span className="text-[12px] text-[color:var(--muted)]">Tỷ giá đang dùng</span>
           <span className="text-right text-[12.5px] font-semibold">
-            1 USDC ≈ {price.usd.toLocaleString('en-US', { maximumFractionDigits: 4 })} USD
+            1 USDC ≈ {price.usd.toLocaleString('vi-VN', { maximumFractionDigits: 4 })} USD
             <br />
             <span className="font-normal text-[color:var(--muted)]">≈ {formatVnd(price.vnd)}</span>
           </span>

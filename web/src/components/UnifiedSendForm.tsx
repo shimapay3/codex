@@ -96,7 +96,7 @@ export default function UnifiedSendForm({ coin }: Props) {
   )
 
   const formatCoinAmount = (value: number) => {
-    return value.toLocaleString('en-US', { maximumFractionDigits: 20 })
+    return value.toLocaleString('vi-VN', { maximumFractionDigits: 20 })
   }
 
   const reset = () => {
@@ -647,7 +647,7 @@ export default function UnifiedSendForm({ coin }: Props) {
             <p className="mt-2 text-[12.5px] leading-relaxed text-[color:var(--muted)]">
               {isUsdc
                 ? `Bạn sẽ gửi toàn bộ số dư ${formatAmount(maxAmount, 2)} ${coin.symbol}. Sau giao dịch, ví sẽ không còn ${coin.symbol}.`
-                : `Bạn sẽ gửi tối đa ${maxAmount.toLocaleString('en-US', { maximumFractionDigits: 6 })} ${coin.symbol} (giữ lại ≈ 0.001 SOL cho phí).`}
+                : `Bạn sẽ gửi tối đa ${maxAmount.toLocaleString('vi-VN', { maximumFractionDigits: 6 })} ${coin.symbol} (giữ lại ≈ 0,001 SOL cho phí).`}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button

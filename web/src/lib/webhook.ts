@@ -63,8 +63,8 @@ export function buildTxMessage(
   const counterparty = entry.counterparty || 'Không xác định'
 
   const feeSol = entry.fee != null && entry.fee > 0
-    ? `◎${entry.fee.toFixed(9)} SOL`
-    : '◎0.000005 SOL (ước tính)'
+    ? `◎${entry.fee.toLocaleString('vi-VN', { minimumFractionDigits: 9, maximumFractionDigits: 9 })} SOL`
+    : '◎0,000005 SOL (ước tính)'
 
   return [
     '🔔 <b>Giao dịch 💠 USDC</b>',

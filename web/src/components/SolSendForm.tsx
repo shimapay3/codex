@@ -77,7 +77,7 @@ export default function SolSendForm() {
           </div>
           <h2 className="relative text-[19px] font-semibold">Chuyển SOL thành công</h2>
           <p className="relative mt-1 text-[13px] text-[color:var(--muted)]">
-            {amount.toLocaleString('en-US', { maximumFractionDigits: 20 })} SOL → {recipientLabel}
+            {amount.toLocaleString('vi-VN', { maximumFractionDigits: 20 })} SOL → {recipientLabel}
           </p>
           {note.trim() && (
             <div className="relative mt-4 rounded-2xl border border-[color:var(--border)] p-3.5 text-left">
@@ -280,7 +280,7 @@ export default function SolSendForm() {
           <div className="flex items-center justify-between text-[13px]">
             <span className="text-[color:var(--muted)]">Số tiền</span>
             <span className="font-semibold tabular-nums">
-              {amount.toLocaleString('en-US', { maximumFractionDigits: 6 })} SOL
+              {amount.toLocaleString('vi-VN', { maximumFractionDigits: 6 })} SOL
             </span>
           </div>
           <div className="flex items-center justify-between text-[13px]">
@@ -348,7 +348,7 @@ export default function SolSendForm() {
           >
             <p className="text-[15px] font-semibold">Xác nhận gửi tối đa?</p>
             <p className="mt-2 text-[12.5px] leading-relaxed text-[color:var(--muted)]">
-              Bạn sẽ gửi tối đa {maxSend.toLocaleString('en-US', { maximumFractionDigits: 6 })} SOL (giữ lại ≈ 0.001 SOL cho phí).
+              Bạn sẽ gửi tối đa {maxSend.toLocaleString('vi-VN', { maximumFractionDigits: 6 })} SOL (giữ lại ≈ 0,001 SOL cho phí).
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button

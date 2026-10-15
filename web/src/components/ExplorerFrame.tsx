@@ -409,8 +409,8 @@ function AddressView({ result }: { result: AddressResult }) {
           </p>
           <p className="mt-1 text-[18px] font-bold tabular-nums">
             {result.sol >= 1000
-              ? result.sol.toLocaleString('en-US', { maximumFractionDigits: 2 })
-              : result.sol.toFixed(4)}{' '}
+              ? result.sol.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
+              : result.sol.toLocaleString('vi-VN', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}{' '}
             <span className="text-[12px] text-[color:var(--muted)]">SOL</span>
           </p>
         </div>
@@ -529,7 +529,7 @@ function TxView({ result }: { result: TxResult }) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-semibold tabular-nums">
-                      {transfer.amount.toFixed(6)} SOL
+                      {transfer.amount.toLocaleString('vi-VN', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} SOL
                     </p>
                     <p className="font-mono text-[10px] text-[color:var(--muted)]">
                       {shortAddress(transfer.from, 4)} → {shortAddress(transfer.to, 4)}

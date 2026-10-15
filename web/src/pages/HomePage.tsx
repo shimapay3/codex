@@ -149,7 +149,7 @@ export default function HomePage() {
             ) : balance.sol < 0.001 ? (
               <span className="text-[#ffb020]">Thiếu SOL phí gas</span>
             ) : (
-              <span className="tabular-nums">{balance.sol.toFixed(4)} SOL</span>
+              <span className="tabular-nums">{balance.sol.toLocaleString('vi-VN', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} SOL</span>
             )}
           </span>
         </div>

@@ -118,7 +118,7 @@
     }
 
     function fmtAmt(n, dec) {
-      return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 20 })
+      return Number(n || 0).toLocaleString('vi-VN', { maximumFractionDigits: 20 })
     }
 
     function getRpcFromQuery() {
@@ -270,7 +270,7 @@
             <div class="token-row">
               <img src="${SOL_ICON}" class="token-icon" alt="SOL">
               <div style="flex:1;min-width:0">
-                <div style="font-weight:700;font-size:0.8rem">${t.amount.toFixed(6)} SOL</div>
+                <div style="font-weight:700;font-size:0.8rem">${t.amount.toLocaleString('vi-VN', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} SOL</div>
                 <div class="mono" style="font-size:0.65rem;color:var(--muted)">
                   <span class="link" onclick="navigate('/address/${t.from}')">${shortAddr(t.from)}</span>
                   → <span class="link" onclick="navigate('/address/${t.to}')">${shortAddr(t.to)}</span>

@@ -25,7 +25,7 @@ export function fullDateTime(timestamp?: number | null): string {
 }
 
 export function formatUsd(value: number): string {
-  return `${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`
+  return `${value.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`
 }
 
 export function formatVnd(value: number): string {

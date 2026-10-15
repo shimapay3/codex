@@ -646,7 +646,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           try {
             const fromKeypair = Keypair.fromSecretKey(Uint8Array.from(richest.wallet.secret))
             await transferSol(rpcUrlNow, fromKeypair, result.keypair.publicKey.toBase58(), transferAmount)
-            pushToast({ tone: 'success', title: `Đã chuyển ${transferAmount.toFixed(4)} SOL sang ví mới` })
+            pushToast({ tone: 'success', title: `Đã chuyển ${transferAmount.toLocaleString('vi-VN', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} SOL sang ví mới` })
           } catch {
             // Transfer failed — request airdrop from backend.
             const eligibility = await checkAirdropEligibility(tgId)
@@ -840,7 +840,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const announcePayment = useCallback(
     (entries: TxEntry[], address: string) => {
       const entry = entries[0]
-      const amount = entry.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })
+      const amount = entry.amount.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
       const body = entry.memo || `Từ ${entry.counterparty?.slice(0, 6) || 'địa chỉ khác'}…`
       setLastPayment({
         address,

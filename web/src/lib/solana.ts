@@ -72,7 +72,7 @@ export function lamportsToSol(lamports: number): number {
 }
 
 export function formatAmount(amount: number, _decimals = 2): string {
-  return amount.toLocaleString('en-US', {
+  return amount.toLocaleString('vi-VN', {
     maximumFractionDigits: 20,
   })
 }
@@ -759,7 +759,7 @@ export async function transferSol(
 }
 
 export function formatSolBalance(sol: number): string {
-  return `◎${sol.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} SOL`
+  return `◎${sol.toLocaleString('vi-VN', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} SOL`
 }
 
 // --- User data cloud sync (contacts, prefs, samples by Telegram ID) --------

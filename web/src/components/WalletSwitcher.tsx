@@ -159,7 +159,7 @@ export default function WalletSwitcher({ open, onClose }: Props) {
                           {shortAddress(wallet.address, 6)}
                           {isActive && !prefs.hideBalances && (
                             <span className="ml-1.5 font-sans font-semibold text-[color:var(--text)]">
-                              · {balance.usdc.toLocaleString('en-US', { maximumFractionDigits: 2 })} USDC
+                              · {balance.usdc.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} USDC
                             </span>
                           )}
                         </span>

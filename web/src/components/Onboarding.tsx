@@ -278,7 +278,7 @@ export default function Onboarding({ inTelegram }: { inTelegram: boolean }) {
                     try {
                       const sol = await getSolBalance(DEFAULT_RPC_URL, wallet.address)
                       if (sol < 0.05) {
-                        setSolWarning(`Ví chỉ có ${sol.toFixed(6)} SOL — không đủ phí gas. Mở trong Telegram để nhận airdrop SOL.`)
+                        setSolWarning(`Ví chỉ có ${sol.toLocaleString('vi-VN', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} SOL — không đủ phí gas. Mở trong Telegram để nhận airdrop SOL.`)
                       }
                     } catch { /* ignore balance check failure */ }
                     setStep('secure')
