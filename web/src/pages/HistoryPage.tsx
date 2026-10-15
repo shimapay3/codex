@@ -3,11 +3,30 @@ import { ArrowDownLeft, ArrowUpRight, Filter, RefreshCw, Search } from 'lucide-r
 import { useWallet } from '../state/WalletProvider'
 import { TxEntry, formatAmount } from '../lib/solana'
 import { splitMemo } from '../lib/categories'
+import { fullDateTime, relativeTime } from '../lib/format'
 import TxList, { TxDetail } from '../components/TxList'
 
 /** Strip all non-digit characters so searching "5.000" or "5,000" or "+5000" all match raw "5000". */
 function digitsOnly(value: string): string {
   return value.replace(/[^0-9]/g, '')
+}
+
+/** Strip separators (spaces, commas, slashes, colons) for flexible date/time matching. */
+function normalizeTime(value: string): string {
+  return value.replace(/[\s,/:]/g, '').toLowerCase()
+}
+
+/** Generate multiple time representations of a blockTime for matching. */
+function timeStrings(blockTime: number | null): string[] {
+  if (!blockTime) return []
+  const date = new Date(blockTime * 1000)
+  const full = fullDateTime(blockTime)                        // "15/10/2026, 12:38"
+  const rel = relativeTime(blockTime)                          // "5 phút trước"
+  const dateOnly = date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) // "15/10/2026"
+  const dateMonth = date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })                   // "15/10"
+  const timeOnly = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })                  // "12:38"
+  const timeDate = `${timeOnly} ${dateOnly}`                   // "12:38 15/10/2026"
+  return [full, rel, dateOnly, dateMonth, timeOnly, timeDate]
 }
 
 type FilterId = 'all' | 'in' | 'out' | 'failed'
@@ -28,11 +47,12 @@ export default function HistoryPage() {
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
     const termDigits = digitsOnly(term)
+    const termTime = normalizeTime(term)
     return history.filter((entry) => {
       if (filter === 'failed' && entry.status !== 'failed') return false
       if (filter !== 'failed' && filter !== 'all' && entry.direction !== filter) return false
       if (!term) return true
-      // MEMO, signature, counterparty address
+      // MEMO, signature, counterparty address (địa chỉ gửi/nhận)
       if (
         entry.memo.toLowerCase().includes(term) ||
         entry.signature.toLowerCase().includes(term) ||
@@ -40,6 +60,13 @@ export default function HistoryPage() {
       ) return true
       // Amount / balance — ignore currency formatting and +/- signs
       if (termDigits && digitsOnly(String(entry.amount)).includes(termDigits)) return true
+      // Slot
+      if (termDigits && digitsOnly(String(entry.slot)).includes(termDigits)) return true
+      // Phí SOL — raw fee or default estimate (0.000005) when fee is 0/null
+      const feeDigits = entry.fee != null && entry.fee > 0 ? digitsOnly(String(entry.fee)) : '0000005'
+      if (termDigits && feeDigits.includes(termDigits)) return true
+      // Mốc thời gian — exact, relative, date-only, time-only, or time+date
+      if (termTime && timeStrings(entry.blockTime).some((s) => normalizeTime(s).includes(termTime))) return true
       // Contact name and contact annotation (note)
       const contact = entry.counterparty ? contacts.find((c) => c.address === entry.counterparty) : null
       if (contact) {
@@ -157,7 +184,7 @@ export default function HistoryPage() {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Tìm theo số tiền, MEMO, danh bạ hoặc chữ ký"
+          placeholder="Tìm theo số tiền, thời gian, slot, phí, danh bạ, địa chỉ…"
           className="w-full bg-transparent py-3 text-[12.5px] outline-none"
         />
       </div>
