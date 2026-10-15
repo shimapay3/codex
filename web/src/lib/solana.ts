@@ -230,7 +230,7 @@ export type SendParams = {
   decimals: number
 }
 
-export type SendResult = { signature: string; slot: number; blockTime: number }
+export type SendResult = { signature: string; slot: number; blockTime: number; status: 'success' | 'pending' }
 
 export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals }: SendParams) {
   const recipient = new PublicKey(to)
@@ -297,24 +297,44 @@ export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals }: Sen
     },
   ])
 
-  await confirmSignature(rpcUrl, signature)
-  const txInfo = await rpcFetch<any>(
-    rpcUrl,
-    'getTransaction',
-    [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }],
-    15000,
-  )
-  return {
-    signature,
-    slot: txInfo?.slot ?? 0,
-    blockTime: txInfo?.blockTime ?? Math.floor(Date.now() / 1000),
+  const confirmed = await confirmSignature(rpcUrl, signature, 30000)
+  if (!confirmed) {
+    return {
+      signature,
+      slot: 0,
+      blockTime: Math.floor(Date.now() / 1000),
+      status: 'pending' as const,
+    }
+  }
+
+  try {
+    const txInfo = await rpcFetch<any>(
+      rpcUrl,
+      'getTransaction',
+      [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }],
+      15000,
+    )
+    return {
+      signature,
+      slot: txInfo?.slot ?? 0,
+      blockTime: txInfo?.blockTime ?? Math.floor(Date.now() / 1000),
+      status: 'success' as const,
+    }
+  } catch {
+    // Confirmed but can't fetch details — still a success
+    return {
+      signature,
+      slot: 0,
+      blockTime: Math.floor(Date.now() / 1000),
+      status: 'success' as const,
+    }
   }
 }
 
 export async function confirmSignature(
   rpcUrl: string,
   signature: string,
-  timeoutMs = 60000,
+  timeoutMs = 30000,
 ): Promise<boolean> {
   const started = Date.now()
   while (Date.now() - started < timeoutMs) {
@@ -335,8 +355,9 @@ export async function confirmSignature(
     }
     await new Promise((resolve) => setTimeout(resolve, 1800))
   }
-  // Confirmation is mandatory — do not treat timeout as success.
-  throw new Error('Giao dịch chưa được xác nhận trên mạng lưới (timeout). Vui lòng thử lại sau.')
+  // Timeout — not confirmed yet, but not rejected. Return false so the caller
+  // can record the transaction as pending and let the sync API re-check it.
+  return false
 }
 
 export type TxEntry = {
@@ -346,7 +367,7 @@ export type TxEntry = {
   direction: 'in' | 'out' | 'self' | 'other'
   amount: number
   decimals: number
-  status: 'success' | 'failed'
+  status: 'success' | 'failed' | 'pending'
   memo: string
   counterparty: string | null
   explorerUrl: string
@@ -696,17 +717,35 @@ export async function transferSol(
     tx.serialize().toString('base64'),
     { encoding: 'base64', skipPreflight: false, preflightCommitment: 'confirmed', maxRetries: 3 },
   ])
-  await confirmSignature(rpcUrl, signature)
-  const txInfo = await rpcFetch<any>(
-    rpcUrl,
-    'getTransaction',
-    [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }],
-    15000,
-  )
-  return {
-    signature,
-    slot: txInfo?.slot ?? 0,
-    blockTime: txInfo?.blockTime ?? Math.floor(Date.now() / 1000),
+  const confirmed = await confirmSignature(rpcUrl, signature, 30000)
+  if (!confirmed) {
+    return {
+      signature,
+      slot: 0,
+      blockTime: Math.floor(Date.now() / 1000),
+      status: 'pending' as const,
+    }
+  }
+  try {
+    const txInfo = await rpcFetch<any>(
+      rpcUrl,
+      'getTransaction',
+      [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }],
+      15000,
+    )
+    return {
+      signature,
+      slot: txInfo?.slot ?? 0,
+      blockTime: txInfo?.blockTime ?? Math.floor(Date.now() / 1000),
+      status: 'success' as const,
+    }
+  } catch {
+    return {
+      signature,
+      slot: 0,
+      blockTime: Math.floor(Date.now() / 1000),
+      status: 'success' as const,
+    }
   }
 }
 
@@ -764,7 +803,7 @@ export type CloudTxRecord = {
   direction: 'in' | 'out' | 'self' | 'other'
   amount: number
   decimals: number
-  status: 'success' | 'failed'
+  status: 'success' | 'failed' | 'pending'
   memo: string
   counterparty: string | null
   tokenSymbol: string

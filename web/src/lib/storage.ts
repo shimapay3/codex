@@ -48,6 +48,7 @@ export const StorageKeys = {
   localData: 'localdata.v1',
   deviceId: 'device.v1',
   pinAttempts: 'pinAttempts.v1',
+  preSendBalance: 'preSendBalance.v1',
 } as const
 
 /** Generate or retrieve a stable per-device identifier for server-side wallet limits.

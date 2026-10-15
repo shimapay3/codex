@@ -154,6 +154,36 @@ export function saveCloudTx(telegramId, tx) {
 }
 
 /**
+ * Update a cloud transaction's status (used by sync to resolve pending txs).
+ */
+export function updateCloudTxStatus(signature, status, slot, blockTime) {
+  const state = getState()
+  const txIndex = state.txIndex || { byAddress: {}, bySignature: {} }
+  const tx = txIndex.bySignature[signature]
+  if (!tx) return false
+
+  tx.status = status
+  if (slot != null) tx.slot = slot
+  if (blockTime != null) tx.blockTime = blockTime
+
+  // Also update in all users' txHistory
+  for (const userId of Object.keys(state.users || {})) {
+    const user = state.users[userId]
+    if (user?.txHistory) {
+      const histTx = user.txHistory.find((t) => t.signature === signature)
+      if (histTx) {
+        histTx.status = status
+        if (slot != null) histTx.slot = slot
+        if (blockTime != null) histTx.blockTime = blockTime
+      }
+    }
+  }
+
+  save()
+  return true
+}
+
+/**
  * Get cloud transaction history for a user, filtered by wallet address.
  */
 export function getUserCloudTxHistory(telegramId, walletAddress) {

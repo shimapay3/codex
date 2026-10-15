@@ -332,8 +332,8 @@ app.post('/api/user/tx', (req, res) => {
     res.status(400).json({ error: 'Giao dịch không hợp lệ' })
     return
   }
-  if (tx.status && tx.status !== 'success') {
-    res.status(400).json({ error: 'Chỉ lưu giao dịch thành công đã được xác nhận' })
+  if (tx.status && tx.status !== 'success' && tx.status !== 'pending') {
+    res.status(400).json({ error: 'Chỉ lưu giao dịch thành công hoặc đang chờ xác nhận' })
     return
   }
   saveCloudTx(String(telegramId), tx)

@@ -11,6 +11,7 @@ import { Keypair } from '@solana/web3.js'
 import { ImportResult, importSecret, secretToBase58 } from '../lib/crypto'
 import {
   DEFAULT_RPC_URL,
+  USDC_MINT,
   PriceInfo,
   TxEntry,
   fetchTokenHistory,
@@ -139,6 +140,7 @@ type WalletContextValue = {
   autoLockSeconds: number | null
   lastPayment: PaymentEvent | null
   airdrop: AirdropState
+  sendDisabled: boolean
   refresh: () => Promise<void>
   setPrefs: (patch: Partial<Prefs>) => void
   createWallet: (input?: string, name?: string) => Promise<WalletRecord>
@@ -221,6 +223,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     signature: null,
     error: null,
   })
+  const [sendDisabled, setSendDisabled] = useState(false)
 
   const vaultKeyRef = useRef<Uint8Array | null>(null)
   const seenRef = useRef<Set<string>>(new Set())
@@ -951,6 +954,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // Requirement 1: re-enable send when no pending transactions remain
+      const hasPending = data.transactions.some((tx) => tx.status === 'pending')
+      setSendDisabled(hasPending)
+
       // Update balance samples
       const previous = vaultRef.current
       if (previous) {
@@ -1207,16 +1214,57 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
       const rpcUrlNow = current.prefs.rpcUrl || DEFAULT_RPC_URL
       const keypair = Keypair.fromSecretKey(Uint8Array.from(wallet.secret))
+      const decimals = balance.decimals || USDC_DECIMALS_FALLBACK
+
+      // Requirement 2: save pre-send balance to localStorage before each send
+      writeLocal(StorageKeys.preSendBalance, {
+        balance: balance.usdc,
+        amount: params.amount,
+        timestamp: Date.now(),
+      })
 
       try {
-        const { signature, slot, blockTime } = await sendUsdc({
+        const result = await sendUsdc({
           rpcUrl: rpcUrlNow,
           from: keypair,
           to: params.to.trim(),
           amount: params.amount,
           memo: params.memo,
-          decimals: balance.decimals || USDC_DECIMALS_FALLBACK,
+          decimals,
         })
+
+        // Requirement 1: if confirmation timed out (>30s), record as pending
+        if (result.status === 'pending') {
+          const tgId = getTelegramUserIdString()
+          if (tgId) {
+            void pushCloudTx(tgId, {
+              signature: result.signature,
+              slot: result.slot,
+              blockTime: result.blockTime,
+              direction: 'out',
+              amount: params.amount,
+              decimals,
+              status: 'pending',
+              memo: params.memo || '',
+              counterparty: params.to.trim(),
+              tokenSymbol: 'USDC',
+              walletAddress: wallet.address,
+              walletName: wallet.name,
+            })
+          }
+          setSendDisabled(true)
+          if (prefs.sound) ringError()
+          vibrate(220)
+          pushToast({
+            tone: 'error',
+            title: 'Giao dịch đang chờ xác nhận',
+            body: 'Quá 30 giây chưa xác nhận. Gửi tạm khoá — sync sẽ kiểm tra lại.',
+            signature: result.signature,
+          })
+          throw new Error('Giao dịch đang chờ xác nhận trên mạng lưới (quá 30 giây). Tính năng gửi tạm thời bị vô hiệu hoá — sync sẽ kiểm tra lại.')
+        }
+
+        const { signature, slot, blockTime } = result
 
         const meta = { ...current.txMeta }
         meta[signature] = {
@@ -1251,7 +1299,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             blockTime,
             direction: 'out',
             amount: params.amount,
-            decimals: balance.decimals || USDC_DECIMALS_FALLBACK,
+            decimals,
             status: 'success',
             memo: params.memo || '',
             counterparty: params.to.trim(),
@@ -1270,7 +1318,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             blockTime,
             direction: 'out',
             amount: params.amount,
-            decimals: balance.decimals || USDC_DECIMALS_FALLBACK,
+            decimals,
             status: 'success',
             memo: params.memo || '',
             counterparty: params.to.trim(),
@@ -1288,6 +1336,66 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         void refresh()
         return signature
       } catch (error: any) {
+        // Skip the pending error — already handled above
+        if (error?.message?.includes('chờ xác nhận')) throw error
+
+        // Requirement 2: exception handling — check balance to detect success
+        try {
+          const postBalance = await getUsdcBalance(rpcUrlNow, wallet.address)
+          const preData = readLocal<{ balance: number; amount: number; timestamp: number }>(
+            StorageKeys.preSendBalance,
+            { balance: 0, amount: 0, timestamp: 0 },
+          )
+          const expectedDecrease = params.amount
+          const actualDecrease = preData.balance - postBalance.amount
+
+          if (actualDecrease > 0 && Math.abs(actualDecrease - expectedDecrease) < 1e-6) {
+            // Balance decreased by the expected amount — treat as success
+            if (prefs.sound) ringSuccess()
+            vibrate([60, 40, 120])
+            pushToast({
+              tone: 'success',
+              title: 'Chuyển tiền thành công',
+              body: `${params.amount} USDC đã gửi (xác nhận qua số dư)`,
+            })
+
+            // Try to find the signature from recent transactions
+            let sig = ''
+            try {
+              const entries = await fetchTokenHistory(rpcUrlNow, wallet.address, USDC_MINT, 5)
+              const found = entries.find(
+                (e) => e.direction === 'out' && Math.abs(e.amount - params.amount) < 1e-6,
+              )
+              if (found) sig = found.signature
+            } catch { /* ignore */ }
+
+            if (sig) {
+              const tgId = getTelegramUserIdString()
+              if (tgId) {
+                void pushCloudTx(tgId, {
+                  signature: sig,
+                  slot: 0,
+                  blockTime: Math.floor(Date.now() / 1000),
+                  direction: 'out',
+                  amount: params.amount,
+                  decimals,
+                  status: 'success',
+                  memo: params.memo || '',
+                  counterparty: params.to.trim(),
+                  tokenSymbol: 'USDC',
+                  walletAddress: wallet.address,
+                  walletName: wallet.name,
+                })
+              }
+            }
+
+            void refresh()
+            return sig || 'confirmed-by-balance'
+          }
+        } catch {
+          // Balance check also failed — fall through to real error
+        }
+
         if (prefs.sound) ringError()
         vibrate(220)
         const message = error?.message || 'Giao dịch thất bại'
@@ -1295,7 +1403,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         throw new Error(message)
       }
     },
-    [balance.decimals, persist, prefs.notifications, prefs.sound, prefs.webhookAutoSend, prefs.webhookBotToken, prefs.webhookTopicUrl, pushToast, refresh],
+    [balance.decimals, balance.usdc, persist, prefs.notifications, prefs.sound, prefs.webhookAutoSend, prefs.webhookBotToken, prefs.webhookTopicUrl, pushToast, refresh],
   )
 
   // --- send SOL -------------------------------------------------------------
@@ -1308,8 +1416,48 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const rpcUrlNow = current.prefs.rpcUrl || DEFAULT_RPC_URL
       const keypair = Keypair.fromSecretKey(Uint8Array.from(wallet.secret))
 
+      // Requirement 2: save pre-send SOL balance to localStorage
+      writeLocal(StorageKeys.preSendBalance, {
+        balance: balance.sol,
+        amount: params.amount,
+        timestamp: Date.now(),
+      })
+
       try {
-        const { signature, slot, blockTime } = await transferSol(rpcUrlNow, keypair, params.to.trim(), params.amount, params.memo)
+        const result = await transferSol(rpcUrlNow, keypair, params.to.trim(), params.amount, params.memo)
+
+        // Requirement 1: if confirmation timed out, record as pending
+        if (result.status === 'pending') {
+          const tgId = getTelegramUserIdString()
+          if (tgId) {
+            void pushCloudTx(tgId, {
+              signature: result.signature,
+              slot: result.slot,
+              blockTime: result.blockTime,
+              direction: 'out',
+              amount: params.amount,
+              decimals: 9,
+              status: 'pending',
+              memo: params.memo || '',
+              counterparty: params.to.trim(),
+              tokenSymbol: 'SOL',
+              walletAddress: wallet.address,
+              walletName: wallet.name,
+            })
+          }
+          setSendDisabled(true)
+          if (prefs.sound) ringError()
+          vibrate(220)
+          pushToast({
+            tone: 'error',
+            title: 'Giao dịch đang chờ xác nhận',
+            body: 'Quá 30 giây chưa xác nhận. Gửi tạm khoá — sync sẽ kiểm tra lại.',
+            signature: result.signature,
+          })
+          throw new Error('Giao dịch đang chờ xác nhận trên mạng lưới (quá 30 giây). Tính năng gửi tạm thời bị vô hiệu hoá — sync sẽ kiểm tra lại.')
+        }
+
+        const { signature, slot, blockTime } = result
 
         if (prefs.sound) ringSuccess()
         vibrate([60, 40, 120])
@@ -1373,6 +1521,34 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         void refresh()
         return signature
       } catch (error: any) {
+        // Skip the pending error — already handled above
+        if (error?.message?.includes('chờ xác nhận')) throw error
+
+        // Requirement 2: exception handling — check SOL balance
+        try {
+          const postSol = await getSolBalance(rpcUrlNow, wallet.address)
+          const preData = readLocal<{ balance: number; amount: number; timestamp: number }>(
+            StorageKeys.preSendBalance,
+            { balance: 0, amount: 0, timestamp: 0 },
+          )
+          const actualDecrease = preData.balance - postSol
+
+          // SOL decrease = amount + fee (~0.000005 SOL), allow 0.01 tolerance
+          if (actualDecrease > 0 && actualDecrease >= params.amount && actualDecrease <= params.amount + 0.01) {
+            if (prefs.sound) ringSuccess()
+            vibrate([60, 40, 120])
+            pushToast({
+              tone: 'success',
+              title: 'Chuyển SOL thành công',
+              body: `${params.amount} SOL đã gửi (xác nhận qua số dư)`,
+            })
+            void refresh()
+            return 'confirmed-by-balance'
+          }
+        } catch {
+          // Balance check also failed — fall through to real error
+        }
+
         if (prefs.sound) ringError()
         vibrate(220)
         const message = error?.message || 'Giao dịch thất bại'
@@ -1380,7 +1556,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         throw new Error(message)
       }
     },
-    [prefs.notifications, prefs.sound, prefs.webhookAutoSend, prefs.webhookBotToken, prefs.webhookTopicUrl, pushToast, refresh],
+    [balance.sol, prefs.notifications, prefs.sound, prefs.webhookAutoSend, prefs.webhookBotToken, prefs.webhookTopicUrl, pushToast, refresh],
   )
 
   const exportSecrets = useCallback(
@@ -1424,6 +1600,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     autoLockSeconds: secondsLeft,
     lastPayment,
     airdrop,
+    sendDisabled,
     refresh,
     setPrefs,
     createWallet,

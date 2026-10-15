@@ -1,6 +1,6 @@
 import { rpcMethod, sanitizeRpcUrl, DEFAULT_RPC } from './rpc.mjs'
 import { getState } from './store.mjs'
-import { getUserCloudTxHistory, getCloudTxsForAddress } from './explorer.mjs'
+import { getUserCloudTxHistory, getCloudTxsForAddress, updateCloudTxStatus } from './explorer.mjs'
 
 /**
  * Unified sync endpoint — the single realtime API the client polls every 5 s.
@@ -253,6 +253,75 @@ async function fetchRecentTxs(rpcUrl, owner, limit = 15) {
   }
 }
 
+/**
+ * Requirement 1: re-check pending transactions via RPC.
+ * For each pending tx, poll getSignatureStatuses:
+ *  - confirmed/finalized → update to 'success' with slot/blockTime
+ *  - err → update to 'failed'
+ *  - still pending or RPC error → leave as 'pending' (retry next sync)
+ */
+async function recheckPendingTxs(rpcUrl, transactions) {
+  const pending = transactions.filter((tx) => tx.status === 'pending')
+  if (pending.length === 0) return transactions
+
+  await Promise.all(
+    pending.map(async (tx) => {
+      try {
+        const statusResult = await rpcMethod(
+          rpcUrl,
+          'getSignatureStatuses',
+          [[tx.signature], { searchTransactionHistory: true }],
+          12000,
+        )
+        const sigStatus = statusResult?.value?.[0]
+
+        if (sigStatus?.err) {
+          updateCloudTxStatus(tx.signature, 'failed', null, null)
+          tx.status = 'failed'
+          return
+        }
+
+        if (
+          sigStatus?.confirmationStatus === 'confirmed' ||
+          sigStatus?.confirmationStatus === 'finalized'
+        ) {
+          // Confirmed — try to get slot/blockTime
+          let slot = sigStatus?.slot ?? 0
+          let blockTime = tx.blockTime
+          try {
+            const txInfo = await rpcMethod(
+              rpcUrl,
+              'getTransaction',
+              [
+                tx.signature,
+                {
+                  encoding: 'jsonParsed',
+                  maxSupportedTransactionVersion: 0,
+                  commitment: 'confirmed',
+                },
+              ],
+              15000,
+            )
+            if (txInfo?.slot) slot = txInfo.slot
+            if (txInfo?.blockTime) blockTime = txInfo.blockTime
+          } catch {
+            // Can't get details — use status slot
+          }
+          updateCloudTxStatus(tx.signature, 'success', slot, blockTime)
+          tx.status = 'success'
+          tx.slot = slot
+          tx.blockTime = blockTime
+        }
+        // else: still pending — leave as is, retry next sync
+      } catch {
+        // RPC error — leave as pending, retry next sync
+      }
+    }),
+  )
+
+  return transactions
+}
+
 export async function handleSync(req, res) {
   const { address, rpcUrl: rawRpc, lastSignature, priceEndpoint, telegramId } = req.body || {}
   if (!address || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
@@ -286,6 +355,11 @@ export async function handleSync(req, res) {
       } else {
         transactions = await fetchRecentTxs(rpcUrl, address, 15)
       }
+    }
+
+    // Requirement 1: re-check pending transactions before returning
+    if (transactions && transactions.length) {
+      transactions = await recheckPendingTxs(rpcUrl, transactions)
     }
 
     const [usdc, sol, price] = await Promise.all([

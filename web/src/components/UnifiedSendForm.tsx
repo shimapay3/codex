@@ -40,6 +40,7 @@ export default function UnifiedSendForm({ coin }: Props) {
     verifyPin,
     pinEnabled,
     saveContacts,
+    sendDisabled,
   } = useWallet()
 
   const [to, setTo] = useState('')
@@ -548,12 +549,18 @@ export default function UnifiedSendForm({ coin }: Props) {
       {stage === 'form' && (
         <button
           type="button"
-          disabled={!validTo || amount <= 0 || insufficient || noFeeBudget}
+          disabled={!validTo || amount <= 0 || insufficient || noFeeBudget || sendDisabled}
           onClick={() => setStage('review')}
           className="flex w-full items-center justify-center gap-2 rounded-2xl accent-gradient py-4 text-[15px] font-semibold text-white shadow-glow disabled:opacity-45"
         >
-          <SendIcon size={17} /> Xem lại & gửi
+          <SendIcon size={17} /> {sendDisabled ? 'Gửi tạm khoá (chờ xác nhận)' : 'Xem lại & gửi'}
         </button>
+      )}
+
+      {sendDisabled && (
+        <p className="flex items-center gap-1.5 rounded-2xl border border-[#ffb020]/40 bg-[#ffb020]/10 px-3.5 py-2.5 text-[12px] text-[#ffc95c]">
+          <AlertTriangle size={14} /> Có giao dịch đang chờ xác nhận. Sync sẽ kiểm tra lại tự động.
+        </p>
       )}
 
       {stage === 'review' && (
