@@ -24,6 +24,7 @@ import {
   USDC_MINT,
 } from '../lib/solana'
 import { isValidAddress, shortAddress } from '../lib/crypto'
+import { getTelegramUserIdString } from '../lib/telegram'
 
 type Props = { initialQuery?: string }
 
@@ -161,6 +162,7 @@ function formatTime(blockTime: number | null): string {
 
 export default function ExplorerFrame({ initialQuery = '' }: Props) {
   const { prefs, activeWallet, history } = useWallet()
+  const hasTelegram = !!getTelegramUserIdString()
   const [query, setQuery] = useState(initialQuery)
   const [result, setResult] = useState<Result>(null)
   const [loading, setLoading] = useState(false)
@@ -283,14 +285,23 @@ export default function ExplorerFrame({ initialQuery = '' }: Props) {
             >
               <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
             </button>
-            <a
-              href={target}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1 rounded-xl border border-[color:var(--border)] px-2.5 py-1.5 text-[10.5px] font-semibold"
-            >
-              <ExternalLink size={12} /> Mở tab
-            </a>
+            {hasTelegram ? (
+              <a
+                href={target}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 rounded-xl border border-[color:var(--border)] px-2.5 py-1.5 text-[10.5px] font-semibold"
+              >
+                <ExternalLink size={12} /> Mở tab
+              </a>
+            ) : (
+              <span
+                className="flex items-center gap-1 rounded-xl border border-[color:var(--border)] px-2.5 py-1.5 text-[10.5px] font-semibold opacity-40 cursor-not-allowed"
+                title="Cần kết nối Telegram để mở explorer"
+              >
+                <ExternalLink size={12} /> Mở tab
+              </span>
+            )}
           </div>
         </div>
 
