@@ -173,7 +173,7 @@ export default function ExplorerFrame({ initialQuery = '' }: Props) {
     if (value.length > 60) return explorerTxUrl(value, rpcUrl)
     if (isValidAddress(value)) return explorerAddressUrl(value, rpcUrl)
     if (activeWallet?.address) return explorerAddressUrl(activeWallet.address, rpcUrl)
-    return `${EXPLORER_BASE}/?cluster=custom&customUrl=${encodeURIComponent(EXPLORER_CUSTOM_URL)}`
+    return `${EXPLORER_BASE}/`
   }, [query, rpcUrl, activeWallet?.address])
 
   const doLookup = useCallback(

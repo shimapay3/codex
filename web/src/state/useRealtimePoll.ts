@@ -23,6 +23,7 @@ type Options = {
   rpcUrl: string
   address: string | null
   priceEndpoint?: string
+  telegramId?: string | null
   enabled: boolean
   onResult: (data: SyncResponse) => void
 }
@@ -32,7 +33,7 @@ type Options = {
  * The server merges balance + history + airdrop status + price into one
  * response so the client makes a single request instead of multiple polls.
  */
-export function useRealtimePoll({ rpcUrl, address, priceEndpoint, enabled, onResult }: Options) {
+export function useRealtimePoll({ rpcUrl, address, priceEndpoint, telegramId, enabled, onResult }: Options) {
   const handler = useRef(onResult)
   handler.current = onResult
 
@@ -48,7 +49,7 @@ export function useRealtimePoll({ rpcUrl, address, priceEndpoint, enabled, onRes
         const res = await fetch('/api/sync', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ address, rpcUrl, priceEndpoint }),
+          body: JSON.stringify({ address, rpcUrl, priceEndpoint, telegramId }),
         })
         if (cancelled || !res.ok) return
         const data: SyncResponse = await res.json()
@@ -65,5 +66,5 @@ export function useRealtimePoll({ rpcUrl, address, priceEndpoint, enabled, onRes
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [enabled, address, rpcUrl, priceEndpoint])
+  }, [enabled, address, rpcUrl, priceEndpoint, telegramId])
 }

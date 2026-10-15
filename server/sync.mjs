@@ -1,5 +1,6 @@
 import { rpcMethod, sanitizeRpcUrl, DEFAULT_RPC } from './rpc.mjs'
 import { getState } from './store.mjs'
+import { getUserCloudTxHistory } from './explorer.mjs'
 
 /**
  * Unified sync endpoint — the single realtime API the client polls every 5 s.
@@ -17,7 +18,7 @@ import { getState } from './store.mjs'
 const USDC_MINT = 'USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2'
 const TOKEN_2022 = 'TokenzQdBNbLqP5VEhPkASv1L5Xuo6YHuHD4qLm9Q'
 
-const EXPLORER_BASE = 'https://explorer.dolaxanh.com'
+const EXPLORER_BASE = 'https://chain.localusd.cloud'
 const EXPLORER_CUSTOM_URL = 'https://localusd.cloud/'
 
 function explorerTxUrl(signature) {
@@ -253,7 +254,7 @@ async function fetchRecentTxs(rpcUrl, owner, limit = 15) {
 }
 
 export async function handleSync(req, res) {
-  const { address, rpcUrl: rawRpc, lastSignature, priceEndpoint } = req.body || {}
+  const { address, rpcUrl: rawRpc, lastSignature, priceEndpoint, telegramId } = req.body || {}
   if (!address || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
     res.status(400).json({ error: 'Địa chỉ không hợp lệ' })
     return
@@ -261,10 +262,23 @@ export async function handleSync(req, res) {
   const rpcUrl = sanitizeRpcUrl(rawRpc) || DEFAULT_RPC
 
   try {
-    const [usdc, sol, transactions, price] = await Promise.all([
+    // When telegramId is provided, use cloud transaction history instead of
+    // RPC (avoids validator slot overflow / empty history).
+    let transactions
+    if (telegramId) {
+      const cloudTxs = getUserCloudTxHistory(telegramId, address)
+      if (cloudTxs.length > 0) {
+        transactions = cloudTxs.slice(0, 15)
+      } else {
+        transactions = await fetchRecentTxs(rpcUrl, address, 15)
+      }
+    } else {
+      transactions = await fetchRecentTxs(rpcUrl, address, 15)
+    }
+
+    const [usdc, sol, price] = await Promise.all([
       fetchUsdcBalance(rpcUrl, address),
       fetchSolBalance(rpcUrl, address),
-      fetchRecentTxs(rpcUrl, address, 15),
       getPrice(priceEndpoint),
     ])
 

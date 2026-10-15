@@ -11,6 +11,7 @@ let state = {
   airdrops: { records: {}, userAirdrops: {} },
   wallets: { devices: {} },
   users: {},
+  txIndex: { byAddress: {}, bySignature: {} },
 }
 
 function ensureDir() {
@@ -31,6 +32,7 @@ export function load() {
       airdrops: parsed.airdrops && typeof parsed.airdrops === 'object' ? parsed.airdrops : { records: {}, userAirdrops: {} },
       wallets: parsed.wallets && typeof parsed.wallets === 'object' ? parsed.wallets : { devices: {} },
       users: parsed.users && typeof parsed.users === 'object' ? parsed.users : {},
+      txIndex: parsed.txIndex && typeof parsed.txIndex === 'object' ? parsed.txIndex : { byAddress: {}, bySignature: {} },
     }
   } catch {
     state = { watches: {} }

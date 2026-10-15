@@ -3,6 +3,7 @@ import express from 'express'
 import { DEFAULT_RPC, handleRpcProxy } from './rpc.mjs'
 import { startAirdropCron, handleAirdropRequest, handleAirdropStatus, handleAirdropInfo, handleAirdropEligibility } from './airdrop.mjs'
 import { handleSync } from './sync.mjs'
+import { handleExplorerAddress, handleExplorerTx, saveCloudTx } from './explorer.mjs'
 import { getState, load, save } from './store.mjs'
 
 const PORT = Number(process.env.PORT || 8000)
@@ -20,6 +21,16 @@ app.use(express.json({ limit: '512kb' }))
 
 app.use((req, res, next) => {
   res.setHeader('Cache-Control', 'no-store')
+  // CORS for explorer endpoints (chain.localusd.cloud cross-origin GETs)
+  if (req.path.startsWith('/api/explorer/')) {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    if (req.method === 'OPTIONS') {
+      res.status(204).end()
+      return
+    }
+  }
   next()
 })
 
@@ -305,6 +316,40 @@ app.post('/api/webhook/send', async (req, res) => {
     res.status(500).json({ ok: false, error: err?.message || 'Lỗi gửi webhook' })
   }
 })
+
+// --- Cloud transaction history (Yêu cầu 1) --------------------------------
+// Every successful send (when inside Telegram) is saved to the cloud so
+// history survives validator slot overflow. The sync API reads from these
+// cloud records instead of polling the validator.
+
+app.post('/api/user/tx', (req, res) => {
+  const { telegramId, tx } = req.body || {}
+  if (!telegramId || !/^\d+$/.test(String(telegramId))) {
+    res.status(400).json({ error: 'Telegram ID không hợp lệ' })
+    return
+  }
+  if (!tx || typeof tx !== 'object' || !tx.signature) {
+    res.status(400).json({ error: 'Giao dịch không hợp lệ' })
+    return
+  }
+  saveCloudTx(String(telegramId), tx)
+  res.json({ ok: true })
+})
+
+app.get('/api/user/tx/:telegramId', (req, res) => {
+  const tgId = req.params.telegramId
+  if (!tgId || !/^\d+$/.test(tgId)) {
+    res.status(400).json({ error: 'Telegram ID không hợp lệ' })
+    return
+  }
+  const state = getState()
+  const user = state.users?.[tgId]
+  res.json({ txHistory: user?.txHistory || [] })
+})
+
+// --- Explorer API (chain.localusd.cloud) -----------------------------------
+app.get('/api/explorer/address/:address', handleExplorerAddress)
+app.get('/api/explorer/tx/:signature', handleExplorerTx)
 
 load()
 

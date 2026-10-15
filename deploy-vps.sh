@@ -38,6 +38,10 @@ $SSH_BASE "set -euo pipefail; cd $REMOTE_DIR/web; npm ci 2>&1 | tail -3; npm run
 echo "==> Fixing permissions for nginx ..."
 $SSH_BASE "chmod o+x /root /root/dev /root/dev/payproject /root/dev/payproject/web /root/dev/payproject/web/dist && chmod -R o+r /root/dev/payproject/web/dist && find /root/dev/payproject/web/dist -type d -exec chmod o+x {} \;"
 
+echo "==> Deploying explorer to /var/www/explorer ..."
+$SSH_BASE "mkdir -p /var/www/explorer"
+sshpass -e scp -o StrictHostKeyChecking=no -o ConnectTimeout=15 explorer/index.html $VPS_USER@$VPS_HOST:/var/www/explorer/index.html
+
 echo "==> Restarting API service ..."
 $SSH_BASE "systemctl restart cloudpay-api && sleep 2 && systemctl is-active cloudpay-api"
 

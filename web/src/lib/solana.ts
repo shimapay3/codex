@@ -32,7 +32,7 @@ export const USDC_AVATAR =
 export const DEFAULT_RPC_URL = 'https://rpc.localusd.cloud'
 export const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
 
-export const EXPLORER_BASE = 'https://explorer.dolaxanh.com'
+export const EXPLORER_BASE = 'https://chain.localusd.cloud'
 export const SOL_ICON = 'https://explorer.solana.com/icon-144.png'
 export const EXPLORER_CUSTOM_URL = 'https://localusd.cloud/'
 export const USDC_DECIMALS_FALLBACK = 6
@@ -728,6 +728,41 @@ export async function pushUserCloudData(
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ telegramId, ...data }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+// --- Cloud transaction history (Yêu cầu 1) --------------------------------
+
+export type CloudTxRecord = {
+  signature: string
+  slot: number
+  blockTime: number | null
+  direction: 'in' | 'out' | 'self' | 'other'
+  amount: number
+  decimals: number
+  status: 'success' | 'failed'
+  memo: string
+  counterparty: string | null
+  tokenSymbol: string
+  walletAddress: string
+  walletName: string
+  explorerUrl: string
+}
+
+/** Save a transaction to the cloud (called after every successful send when in Telegram). */
+export async function pushCloudTx(
+  telegramId: string,
+  tx: Omit<CloudTxRecord, 'explorerUrl'>,
+): Promise<boolean> {
+  try {
+    const res = await fetch('/api/user/tx', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ telegramId, tx: { ...tx, explorerUrl: explorerTxUrl(tx.signature) } }),
     })
     return res.ok
   } catch {

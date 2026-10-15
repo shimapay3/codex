@@ -27,6 +27,7 @@ import {
   registerWalletWithServer,
   fetchUserCloudData,
   pushUserCloudData,
+  pushCloudTx,
 } from '../lib/solana'
 import {
   primeAudio,
@@ -977,6 +978,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     rpcUrl,
     address: activeAddress,
     priceEndpoint: prefs.priceEndpoint,
+    telegramId: getTelegramUserIdString(),
     enabled: session === 'unlocked' && !!activeAddress,
     onResult: handleRealtimePoll,
   })
@@ -1239,6 +1241,25 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           signature,
         })
 
+        // Save to cloud + optionally send webhook (when inside Telegram)
+        const tgId = getTelegramUserIdString()
+        if (tgId) {
+          void pushCloudTx(tgId, {
+            signature,
+            slot: 0,
+            blockTime: Math.floor(Date.now() / 1000),
+            direction: 'out',
+            amount: params.amount,
+            decimals: balance.decimals || USDC_DECIMALS_FALLBACK,
+            status: 'success',
+            memo: params.memo || '',
+            counterparty: params.to.trim(),
+            tokenSymbol: 'USDC',
+            walletAddress: wallet.address,
+            walletName: wallet.name,
+          })
+        }
+
         // Auto-send webhook if enabled and config is complete
         if (prefs.webhookAutoSend && prefs.webhookBotToken.trim() && prefs.webhookTopicUrl.trim() && !isWebhookSent(signature)) {
           const contact = current.contacts.find((c) => c.address === params.to.trim())
@@ -1252,7 +1273,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             status: 'success',
             memo: params.memo || '',
             counterparty: params.to.trim(),
-            explorerUrl: `https://explorer.solana.com/tx/${signature}`,
+            explorerUrl: `https://chain.localusd.cloud/tx/${signature}`,
           }
           const message = buildTxMessage(txEntry, wallet.name, wallet.address, contact?.name)
           void sendWebhook(prefs.webhookBotToken, prefs.webhookTopicUrl, message).then((result) => {
@@ -1305,6 +1326,25 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           signature,
         })
 
+        // Save to cloud (when inside Telegram)
+        const tgId = getTelegramUserIdString()
+        if (tgId) {
+          void pushCloudTx(tgId, {
+            signature,
+            slot: 0,
+            blockTime: Math.floor(Date.now() / 1000),
+            direction: 'out',
+            amount: params.amount,
+            decimals: 9,
+            status: 'success',
+            memo: params.memo || '',
+            counterparty: params.to.trim(),
+            tokenSymbol: 'SOL',
+            walletAddress: wallet.address,
+            walletName: wallet.name,
+          })
+        }
+
         // Auto-send webhook if enabled and config is complete
         if (prefs.webhookAutoSend && prefs.webhookBotToken.trim() && prefs.webhookTopicUrl.trim() && !isWebhookSent(signature)) {
           const contact = current.contacts.find((c) => c.address === params.to.trim())
@@ -1318,7 +1358,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             status: 'success',
             memo: params.memo || '',
             counterparty: params.to.trim(),
-            explorerUrl: `https://explorer.solana.com/tx/${signature}`,
+            explorerUrl: `https://chain.localusd.cloud/tx/${signature}`,
           }
           const message = buildTxMessage(txEntry, wallet.name, wallet.address, contact?.name)
           void sendWebhook(prefs.webhookBotToken, prefs.webhookTopicUrl, message).then((result) => {
