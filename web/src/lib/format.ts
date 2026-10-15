@@ -50,40 +50,84 @@ export function copyToClipboard(value: string): Promise<void> {
 export function downloadTextFile(filename: string, content: string, mime = 'application/json') {
   const blob = new Blob([content], { type: mime })
   const url = URL.createObjectURL(blob)
-  const escaped = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-  // Try popup approach — works in restricted browsers / Telegram WebView
-  const popup = window.open('', '_blank')
-  if (popup) {
-    popup.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${filename}</title>
-      <style>
-        body{font-family:system-ui,-apple-system,sans-serif;padding:24px;max-width:600px;margin:0 auto;text-align:center}
-        .btn{display:inline-block;padding:12px 28px;border-radius:12px;background:#22e07a;color:#fff;text-decoration:none;font-weight:600;font-size:15px;margin:12px 0}
-        textarea{width:100%;height:200px;margin-top:12px;font-size:11px;font-family:monospace;border:1px solid #ddd;border-radius:8px;padding:8px;resize:vertical}
-        p{color:#666;font-size:13px}
-      </style></head><body>
-      <h3>📄 ${filename}</h3>
-      <a class="btn" href="${url}" download="${filename}">⬇ Tải xuống file</a>
-      <p>Nếu nút trên không hoạt động, hãy sao chép nội dung bên dưới:</p>
-      <textarea readonly onclick="this.select()">${escaped}</textarea>
-      </body></html>`)
-    popup.document.close()
-    // Auto-trigger download in popup
-    const link = popup.document.createElement('a')
-    link.href = url
-    link.download = filename
-    popup.document.body.appendChild(link)
-    link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 30000)
-    return
+  // In-app modal overlay — works in Telegram WebView and restricted browsers
+  const overlay = document.createElement('div')
+  overlay.style.cssText =
+    'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;font-family:system-ui,-apple-system,sans-serif'
+
+  const card = document.createElement('div')
+  card.style.cssText =
+    'background:#1a1a2e;color:#e0e0e0;border-radius:20px;padding:20px;max-width:460px;width:100%;max-height:85vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,0.4)'
+
+  const title = document.createElement('h3')
+  title.textContent = '📄 ' + filename
+  title.style.cssText = 'margin:0 0 8px;font-size:15px;font-weight:600;word-break:break-all'
+
+  const hint = document.createElement('p')
+  hint.textContent = 'Sao chép nội dung bên dưới hoặc bấm Tải xuống:'
+  hint.style.cssText = 'margin:0 0 12px;font-size:12px;color:#999'
+
+  const ta = document.createElement('textarea')
+  ta.readOnly = true
+  ta.value = content
+  ta.style.cssText =
+    'width:100%;height:180px;font-size:11px;font-family:monospace;border:1px solid #333;border-radius:10px;padding:10px;background:#111;color:#ccc;resize:vertical;box-sizing:border-box'
+
+  const btnRow = document.createElement('div')
+  btnRow.style.cssText = 'display:flex;gap:10px;margin-top:14px'
+
+  const copyBtn = document.createElement('button')
+  copyBtn.textContent = '📋 Sao chép'
+  copyBtn.style.cssText =
+    'flex:1;padding:12px;border:none;border-radius:12px;background:#333;color:#fff;font-size:13px;font-weight:600;cursor:pointer'
+
+  const dlBtn = document.createElement('button')
+  dlBtn.textContent = '⬇ Tải xuống'
+  dlBtn.style.cssText =
+    'flex:1;padding:12px;border:none;border-radius:12px;background:#22e07a;color:#fff;font-size:13px;font-weight:600;cursor:pointer'
+
+  const closeBtn = document.createElement('button')
+  closeBtn.textContent = '✕ Đóng'
+  closeBtn.style.cssText =
+    'flex:1;padding:12px;border:none;border-radius:12px;background:#555;color:#fff;font-size:13px;font-weight:600;cursor:pointer'
+
+  const cleanup = () => {
+    if (overlay.parentNode) document.body.removeChild(overlay)
+    URL.revokeObjectURL(url)
   }
 
-  // Fallback: in-page download
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  setTimeout(() => URL.revokeObjectURL(url), 4000)
+  copyBtn.onclick = async () => {
+    ta.select()
+    try {
+      await navigator.clipboard?.writeText(content)
+    } catch {
+      document.execCommand('copy')
+    }
+    copyBtn.textContent = '✅ Đã sao chép'
+    setTimeout(() => (copyBtn.textContent = '📋 Sao chép'), 2000)
+  }
+
+  dlBtn.onclick = () => {
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  closeBtn.onclick = cleanup
+  overlay.onclick = (e) => { if (e.target === overlay) cleanup() }
+
+  btnRow.appendChild(copyBtn)
+  btnRow.appendChild(dlBtn)
+  btnRow.appendChild(closeBtn)
+  card.appendChild(title)
+  card.appendChild(hint)
+  card.appendChild(ta)
+  card.appendChild(btnRow)
+  overlay.appendChild(card)
+  document.body.appendChild(overlay)
 }
