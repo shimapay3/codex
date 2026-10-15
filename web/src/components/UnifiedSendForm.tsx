@@ -95,9 +95,7 @@ export default function UnifiedSendForm({ coin }: Props) {
   )
 
   const formatCoinAmount = (value: number) => {
-    if (isUsdc) return formatAmount(value, value < 1 ? 4 : 2)
-    if (isSol) return value.toLocaleString('en-US', { maximumFractionDigits: 6 })
-    return value.toLocaleString('en-US', { maximumFractionDigits: coin.decimals })
+    return value.toLocaleString('en-US', { maximumFractionDigits: 20 })
   }
 
   const reset = () => {

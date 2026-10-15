@@ -71,10 +71,9 @@ export function lamportsToSol(lamports: number): number {
   return lamports / 1_000_000_000
 }
 
-export function formatAmount(amount: number, decimals = 2): string {
+export function formatAmount(amount: number, _decimals = 2): string {
   return amount.toLocaleString('en-US', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
+    maximumFractionDigits: 20,
   })
 }
 

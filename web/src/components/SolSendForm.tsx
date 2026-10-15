@@ -77,7 +77,7 @@ export default function SolSendForm() {
           </div>
           <h2 className="relative text-[19px] font-semibold">Chuyển SOL thành công</h2>
           <p className="relative mt-1 text-[13px] text-[color:var(--muted)]">
-            {amount.toLocaleString('en-US', { maximumFractionDigits: 6 })} SOL → {recipientLabel}
+            {amount.toLocaleString('en-US', { maximumFractionDigits: 20 })} SOL → {recipientLabel}
           </p>
           {note.trim() && (
             <div className="relative mt-4 rounded-2xl border border-[color:var(--border)] p-3.5 text-left">
