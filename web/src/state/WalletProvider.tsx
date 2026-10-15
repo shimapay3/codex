@@ -941,9 +941,18 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Update history
+      // Update history — merge server transactions with existing list
+      // (server returns at most 15; replace would lose older entries)
       if (data.transactions.length) {
-        setHistory(data.transactions)
+        setHistory((prev) => {
+          const serverSigs = new Set(data.transactions.map((t: TxEntry) => t.signature))
+          const merged = [
+            ...data.transactions,
+            ...prev.filter((t) => !serverSigs.has(t.signature)),
+          ]
+          merged.sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0))
+          return merged
+        })
         const first = seenRef.current.size === 0
         const fresh = data.transactions.filter(
           (entry) => entry.direction === 'in' && entry.status === 'success' && !seenRef.current.has(entry.signature),
