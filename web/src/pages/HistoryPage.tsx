@@ -166,7 +166,7 @@ export default function HistoryPage() {
       </div>
 
       <p className="px-1 text-[10.5px] text-[color:var(--muted)]">
-        Hiển thị {filtered.length} / {history.length} giao dịch gần nhất.
+        Hiển thị {filtered.length} / {history.length} giao dịch.
       </p>
 
       <TxDetail entry={selected} onClose={() => setSelected(null)} />

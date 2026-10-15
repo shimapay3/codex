@@ -342,26 +342,26 @@ export async function handleSync(req, res) {
     if (telegramId) {
       const cloudTxs = getUserCloudTxHistory(telegramId, address)
       if (cloudTxs.length > 0) {
-        transactions = cloudTxs.slice(0, 15)
+        transactions = cloudTxs
         fromCloud = true
       } else {
         // Fallback: check txIndex by address (populated even if user txHistory is empty)
         const indexTxs = getCloudTxsForAddress(address)
         if (indexTxs.length > 0) {
-          transactions = indexTxs.slice(0, 15)
+          transactions = indexTxs
           fromCloud = true
         } else {
-          transactions = await fetchRecentTxs(rpcUrl, address, 15)
+          transactions = await fetchRecentTxs(rpcUrl, address, 50)
         }
       }
     } else {
       // No telegramId — try txIndex by address first, then RPC
       const indexTxs = getCloudTxsForAddress(address)
       if (indexTxs.length > 0) {
-        transactions = indexTxs.slice(0, 15)
+        transactions = indexTxs
         fromCloud = true
       } else {
-        transactions = await fetchRecentTxs(rpcUrl, address, 15)
+        transactions = await fetchRecentTxs(rpcUrl, address, 50)
       }
     }
 

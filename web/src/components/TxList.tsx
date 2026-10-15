@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowDownLeft, ArrowUpRight, Check, ExternalLink, Loader2, Send, Sparkles, Webhook, X } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Check, ChevronLeft, ChevronRight, ExternalLink, Loader2, Send, Sparkles, Webhook, X } from 'lucide-react'
 import { TxEntry, formatAmount } from '../lib/solana'
 import { splitMemo } from '../lib/categories'
 import { copyToClipboard, formatUsd, formatVnd, fullDateTime, relativeTime } from '../lib/format'
@@ -277,6 +277,8 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
   )
 }
 
+const PAGE_SIZE = 10
+
 export default function TxList({
   entries,
   loading,
@@ -290,7 +292,14 @@ export default function TxList({
   onSelect: (entry: TxEntry) => void
   limit?: number
 }) {
+  const [page, setPage] = useState(0)
+
+  // Reset to first page when entries change (filter/search)
+  useEffect(() => { setPage(0) }, [entries])
+
   const list = limit ? entries.slice(0, limit) : entries
+  const paginated = limit ? list : list.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
+  const totalPages = limit ? 1 : Math.ceil(list.length / PAGE_SIZE)
 
   if (loading && entries.length === 0) {
     return (
@@ -314,10 +323,35 @@ export default function TxList({
   }
 
   return (
-    <div className="divide-y divide-[color:var(--border)]">
-      {list.map((entry) => (
-        <TxRow key={entry.signature} entry={entry} onSelect={onSelect} />
-      ))}
+    <div>
+      <div className="divide-y divide-[color:var(--border)]">
+        {paginated.map((entry) => (
+          <TxRow key={entry.signature} entry={entry} onSelect={onSelect} />
+        ))}
+      </div>
+      {!limit && totalPages > 1 && (
+        <div className="mt-3 flex items-center justify-center gap-3 pb-1">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="flex h-9 w-9 items-center justify-center rounded-xl glass text-[color:var(--muted)] transition disabled:opacity-30"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <span className="text-[12px] font-medium tabular-nums text-[color:var(--muted)]">
+            {page + 1} / {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            className="flex h-9 w-9 items-center justify-center rounded-xl glass text-[color:var(--muted)] transition disabled:opacity-30"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
