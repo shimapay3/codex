@@ -4,6 +4,8 @@ import { TxEntry, PriceInfo, AirdropInfo } from '../lib/solana'
 export type SyncResponse = {
   address: string
   usdcBalance: number
+  xsaBalance: number
+  xsaDecimals: number
   solBalance: number
   decimals: number
   transactions: TxEntry[]
@@ -16,6 +18,7 @@ export type SyncResponse = {
     error: string | null
   }
   price: PriceInfo
+  xsaPrice: PriceInfo
   at: number
 }
 

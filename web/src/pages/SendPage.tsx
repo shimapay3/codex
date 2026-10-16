@@ -13,7 +13,7 @@ export default function SendPage() {
           Gửi {coin.symbol}
         </h1>
         <p className="mt-0.5 text-[12px] text-[color:var(--muted)]">
-          {coin.id === 'usdc'
+          {coin.id === 'usdc' || coin.id === 'xsa'
             ? 'Ký bằng Passkey · MEMO nổi bật · xác nhận tức thì'
             : `Chuyển ${coin.symbol} · ghi chú MEMO · xác nhận tức thì`}
         </p>

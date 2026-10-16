@@ -14,10 +14,18 @@ import {
 } from '@solana/spl-token'
 import { getTelegramUserIdString } from './telegram'
 
-/** Cloud Chain USDC token — the single supported asset of Cloud Pay Wallet. */
+/** Cloud Chain USDC token — the primary supported asset of Cloud Pay Wallet. */
 export const USDC_MINT = 'USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2'
 export const USDC_SYMBOL = 'USDC'
 export const USDC_NAME = 'USD Coin'
+
+/** Cloud Chain XSA token — second supported asset, same Token-2022 program as USDC. */
+export const XSA_MINT = 'XSAdG6BXMCFxD5Q8qHtJqEHisSk3qdEVDZt8YvTjX47'
+export const XSA_SYMBOL = 'XSA'
+export const XSA_NAME = 'XSA Token'
+
+/** All supported token mints — used for balance/history aggregation. */
+export const SUPPORTED_MINTS = [USDC_MINT, XSA_MINT] as const
 
 /**
  * Cloud Chain's USDC is issued under the **Token-2022** (Token Extensions)
@@ -228,16 +236,19 @@ export type SendParams = {
   amount: number
   memo: string
   decimals: number
+  /** Token mint address (defaults to USDC_MINT for backward compatibility). */
+  mint?: string
 }
 
 export type SendResult = { signature: string; slot: number; blockTime: number; fee: number; status: 'success' | 'pending' }
 
-export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals }: SendParams) {
+export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals, mint: mintStr }: SendParams) {
   const recipient = new PublicKey(to)
-  const mint = new PublicKey(USDC_MINT)
+  const mint = new PublicKey(mintStr || USDC_MINT)
 
-  const fromAta = await getAssociatedTokenAddress(mint, from.publicKey, false, USDC_TOKEN_PROGRAM)
-  const toAta = await getAssociatedTokenAddress(mint, recipient, false, USDC_TOKEN_PROGRAM)
+  const tokenProgram = USDC_TOKEN_PROGRAM
+  const fromAta = await getAssociatedTokenAddress(mint, from.publicKey, false, tokenProgram)
+  const toAta = await getAssociatedTokenAddress(mint, recipient, false, tokenProgram)
 
   const [ataInfo, blockhash] = await Promise.all([
     rpcFetch<any>(rpcUrl, 'getAccountInfo', [toAta.toBase58(), { encoding: 'base64' }]),
@@ -248,7 +259,7 @@ export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals }: Sen
   tx.feePayer = from.publicKey
   tx.recentBlockhash = blockhash.value.blockhash
 
-  // Recipients that never held USDC need their token account opened first.
+  // Recipients that never held the token need their token account opened first.
   if (!ataInfo?.value) {
     tx.add(
       createAssociatedTokenAccountInstruction(
@@ -256,7 +267,7 @@ export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals }: Sen
         toAta,
         recipient,
         mint,
-        USDC_TOKEN_PROGRAM,
+        tokenProgram,
       ),
     )
   }
@@ -271,7 +282,7 @@ export async function sendUsdc({ rpcUrl, from, to, amount, memo, decimals }: Sen
       baseUnits,
       decimals,
       [],
-      USDC_TOKEN_PROGRAM,
+      tokenProgram,
     ),
   )
 
@@ -375,6 +386,8 @@ export type TxEntry = {
   memo: string
   counterparty: string | null
   explorerUrl: string
+  /** Token symbol for this transaction (defaults to 'USDC' for legacy records). */
+  tokenSymbol?: string
 }
 
 /**
@@ -433,7 +446,6 @@ export async function fetchTokenHistory(
   mint = USDC_MINT,
   limit?: number,
 ): Promise<TxEntry[]> {
-  if (mint !== USDC_MINT) return []
   const res = await fetch('/api/sync', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -451,7 +463,6 @@ export async function fetchTransactionSummary(
   owner: string,
   mint = USDC_MINT,
 ): Promise<TxEntry | null> {
-  if (mint !== USDC_MINT) return null
   try {
     const res = await fetch(`/api/explorer/tx/${encodeURIComponent(signature)}?rpc=${encodeURIComponent(rpcUrl)}&address=${encodeURIComponent(owner)}`)
     if (!res.ok) return null

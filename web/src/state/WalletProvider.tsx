@@ -12,6 +12,7 @@ import { ImportResult, importSecret, secretToBase58 } from '../lib/crypto'
 import {
   DEFAULT_RPC_URL,
   USDC_MINT,
+  XSA_MINT,
   PriceInfo,
   TxEntry,
   fetchTokenHistory,
@@ -111,7 +112,7 @@ export type Toast = {
   createdAt: number
 }
 
-export type BalanceState = { usdc: number; sol: number; decimals: number; loading: boolean }
+export type BalanceState = { usdc: number; xsa: number; sol: number; decimals: number; loading: boolean }
 
 export type AirdropState = {
   status: 'idle' | 'pending' | 'sending' | 'confirmed' | 'error'
@@ -131,6 +132,7 @@ type WalletContextValue = {
   samples: BalanceSample[]
   prefs: Prefs
   price: PriceInfo
+  xsaPrice: PriceInfo
   balance: BalanceState
   history: TxEntry[]
   historyLoading: boolean
@@ -157,6 +159,7 @@ type WalletContextValue = {
     memo: string
     category?: string
     wish?: string
+    mint?: string
   }) => Promise<string>
   sendSol: (params: { to: string; amount: number; memo?: string }) => Promise<string>
   unlockWithPin: (pin: string) => Promise<void>
@@ -208,8 +211,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null)
   const [pinEnabled, setPinEnabled] = useState<boolean>(() => !!loadPinWrap())
   const [price, setPrice] = useState<PriceInfo>({ usd: 1, vnd: 30000, source: 'fixed' })
+  const [xsaPrice, setXsaPrice] = useState<PriceInfo>({ usd: 1, vnd: 30000, source: 'fixed' })
   const [balance, setBalance] = useState<BalanceState>({
     usdc: 0,
+    xsa: 0,
     sol: 0,
     decimals: USDC_DECIMALS_FALLBACK,
     loading: false,
@@ -851,12 +856,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const rpcUrl = current?.prefs.rpcUrl || DEFAULT_RPC_URL
     setBalance((state) => ({ ...state, loading: true }))
     try {
-      const [usdc, sol] = await Promise.all([
+      const [usdc, xsa, sol] = await Promise.all([
         getUsdcBalance(rpcUrl, wallet.address),
+        getUsdcBalance(rpcUrl, wallet.address, XSA_MINT),
         getSolBalance(rpcUrl, wallet.address),
       ])
       if (!isCurrentWallet(wallet.address, rpcUrl)) return
-      setBalance({ usdc: usdc.amount, sol, decimals: usdc.decimals, loading: false })
+      setBalance({ usdc: usdc.amount, xsa: xsa.amount, sol, decimals: usdc.decimals, loading: false })
 
       const previous = vaultRef.current
       if (previous) {
@@ -886,6 +892,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     (entries: TxEntry[], address: string) => {
       const entry = entries[0]
       const amount = entry.amount.toLocaleString('vi-VN', { maximumFractionDigits: 20 })
+      const symbol = entry.tokenSymbol || 'USDC'
       const body = entry.memo || `Từ ${entry.counterparty?.slice(0, 6) || 'địa chỉ khác'}…`
       setLastPayment({
         address,
@@ -897,11 +904,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (prefs.sound) ringIncoming()
       vibrate([90, 60, 90])
       if (prefs.notifications) {
-        showSystemNotification(`+${amount} USDC đã nhận`, body, entry.signature)
+        showSystemNotification(`+${amount} ${symbol} đã nhận`, body, entry.signature)
       }
       pushToast({
         tone: 'payment',
-        title: `+${amount} USDC đã nhận`,
+        title: `+${amount} ${symbol} đã nhận`,
         body,
         signature: entry.signature,
       })
@@ -955,6 +962,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       // Update balances
       setBalance({
         usdc: data.usdcBalance,
+        xsa: data.xsaBalance ?? 0,
         sol: data.solBalance,
         decimals: data.decimals || USDC_DECIMALS_FALLBACK,
         loading: false,
@@ -963,6 +971,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       // Update price
       if (data.price) {
         setPrice(data.price)
+      }
+      if (data.xsaPrice) {
+        setXsaPrice(data.xsaPrice)
       }
 
       // Update airdrop status from sync
@@ -1215,7 +1226,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setPinEnabled(false)
     setHistory([])
     setHistoryLoading(false)
-    setBalance({ usdc: 0, sol: 0, decimals: USDC_DECIMALS_FALLBACK, loading: false })
+    setBalance({ usdc: 0, xsa: 0, sol: 0, decimals: USDC_DECIMALS_FALLBACK, loading: false })
     setLastPayment(null)
     setAirdrop({ status: 'idle', payserver: null, signature: null, error: null })
     setToasts([])
@@ -1258,7 +1269,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // --- sending --------------------------------------------------------------
   const send = useCallback(
-    async (params: { to: string; amount: number; memo: string; category?: string; wish?: string }) => {
+    async (params: { to: string; amount: number; memo: string; category?: string; wish?: string; mint?: string }) => {
       const current = vaultRef.current
       const wallet = current?.wallets.find((w) => w.id === current.activeWalletId) || current?.wallets[0]
       if (!current || !wallet) throw new Error('Chưa chọn ví')
@@ -1266,6 +1277,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const rpcUrlNow = current.prefs.rpcUrl || DEFAULT_RPC_URL
       const keypair = Keypair.fromSecretKey(Uint8Array.from(wallet.secret))
       const decimals = balance.decimals || USDC_DECIMALS_FALLBACK
+      const mintAddress = params.mint || USDC_MINT
+      const tokenSymbol = mintAddress === XSA_MINT ? 'XSA' : 'USDC'
 
       // Requirement 2: save pre-send balance to localStorage before each send
       writeLocal(StorageKeys.preSendBalance, {
@@ -1282,6 +1295,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           amount: params.amount,
           memo: params.memo,
           decimals,
+          mint: mintAddress,
         })
 
         // Only confirmed sends enter local history; pending status is resolved by sync.
@@ -1307,7 +1321,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
               status: 'pending',
               memo: params.memo || '',
               counterparty: params.to.trim(),
-              tokenSymbol: 'USDC',
+              tokenSymbol,
               walletAddress: wallet.address,
               walletName: wallet.name,
             })
@@ -1340,14 +1354,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         if (prefs.notifications) {
           showSystemNotification(
             'Chuyển tiền thành công',
-            `${params.amount} USDC · ${params.memo || 'không ghi chú'}`,
+            `${params.amount} ${tokenSymbol} · ${params.memo || 'không ghi chú'}`,
             signature,
           )
         }
         pushToast({
           tone: 'success',
           title: 'Chuyển tiền thành công',
-          body: `${params.amount} USDC đã gửi`,
+          body: `${params.amount} ${tokenSymbol} đã gửi`,
           signature,
         })
 
@@ -1365,7 +1379,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             status: 'success',
             memo: params.memo || '',
             counterparty: params.to.trim(),
-            tokenSymbol: 'USDC',
+            tokenSymbol,
             walletAddress: wallet.address,
             walletName: wallet.name,
           })
@@ -1419,13 +1433,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             pushToast({
               tone: 'success',
               title: 'Chuyển tiền thành công',
-              body: `${params.amount} USDC đã gửi (xác nhận qua số dư)`,
+              body: `${params.amount} ${tokenSymbol} đã gửi (xác nhận qua số dư)`,
             })
 
             // Try to find the signature from recent transactions
             let sig = ''
             try {
-              const entries = await fetchTokenHistory(rpcUrlNow, wallet.address, USDC_MINT, 5)
+              const entries = await fetchTokenHistory(rpcUrlNow, wallet.address, mintAddress, 5)
               const found = entries.find(
                 (e) => e.direction === 'out' && Math.abs(e.amount - params.amount) < 1e-6,
               )
@@ -1446,7 +1460,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
                   status: 'success',
                   memo: params.memo || '',
                   counterparty: params.to.trim(),
-                  tokenSymbol: 'USDC',
+                  tokenSymbol,
                   walletAddress: wallet.address,
                   walletName: wallet.name,
                 })
@@ -1657,6 +1671,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     samples: vault?.samples || [],
     prefs,
     price,
+    xsaPrice,
     balance,
     history,
     historyLoading,

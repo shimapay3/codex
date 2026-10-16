@@ -1,6 +1,6 @@
 import { rpcMethod, sanitizeRpcUrl, DEFAULT_RPC } from './rpc.mjs'
 import { getState, save } from './store.mjs'
-import { projectWalletTx, mergeTransactions, parseUsdcTransaction } from './tx-history.mjs'
+import { projectWalletTx, mergeTransactions, parseUsdcTransaction, USDC_MINT, XSA_MINT } from './tx-history.mjs'
 
 /**
  * Explorer API — serves chain.localusd.cloud.
@@ -13,10 +13,10 @@ import { projectWalletTx, mergeTransactions, parseUsdcTransaction } from './tx-h
  * All endpoints are GET-only and read-only, so CORS * is safe.
  */
 
-const USDC_MINT = 'USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2'
 const TOKEN_2022 = 'TokenzQdBNbLqP5VEhPkASv1L5Xuo6YHuHD4qLm9Q'
 const SOL_ICON = 'https://explorer.solana.com/icon-144.png'
 const USDC_ICON = 'https://usdc.dolaxanh.com/a/ACg8ocJtRSV_No5FrhpG55lc3nUSspbIExRO0CVJIMLt4SXgiobyEoI5=s72-c-no'
+const XSA_ICON = 'https://usdc.dolaxanh.com/a/ACg8ocJtRSV_No5FrhpG55lc3nUSspbIExRO0CVJIMLt4SXgiobyEoI5=s72-c-no'
 
 /** Cloud Chain USDC luôn dùng 9 decimals — không phải 6 như mainnet. */
 const USDC_DECIMALS = 9
@@ -38,9 +38,12 @@ export function normalizeCloudTxAmount(tx) {
   if (!tx) return tx
   tx = { ...tx } // Read-time formatting must not mutate the canonical record.
   const isSol = tx.tokenSymbol === 'SOL'
-  if (!isSol && tx.decimals != null && tx.decimals !== USDC_DECIMALS) {
+  const isXsa = tx.tokenSymbol === 'XSA'
+  if (isSol || isXsa) return tx
+  // USDC records: Cloud Chain USDC always uses 9 decimals.
+  if (tx.decimals != null && tx.decimals !== USDC_DECIMALS) {
     tx.decimals = USDC_DECIMALS
-  } else if (!isSol && tx.decimals == null) {
+  } else if (tx.decimals == null) {
     tx.decimals = USDC_DECIMALS
   }
   return tx
@@ -81,10 +84,10 @@ async function fetchSolBalance(rpcUrl, owner) {
   }
 }
 
-async function fetchUsdcBalance(rpcUrl, owner) {
+async function fetchTokenBalance(rpcUrl, owner, mint) {
   try {
     const [byMint, byProgram] = await Promise.allSettled([
-      rpcMethod(rpcUrl, 'getTokenAccountsByOwner', [owner, { mint: USDC_MINT }, { encoding: 'jsonParsed' }]),
+      rpcMethod(rpcUrl, 'getTokenAccountsByOwner', [owner, { mint }, { encoding: 'jsonParsed' }]),
       rpcMethod(rpcUrl, 'getTokenAccountsByOwner', [owner, { programId: TOKEN_2022 }, { encoding: 'jsonParsed' }]),
     ])
     const seen = new Map()
@@ -93,7 +96,7 @@ async function fetchUsdcBalance(rpcUrl, owner) {
       if (outcome.status !== 'fulfilled') continue
       for (const entry of outcome.value?.value || []) {
         const entryMint = entry?.account?.data?.parsed?.info?.mint
-        if (entryMint && entryMint !== USDC_MINT) continue
+        if (entryMint && entryMint !== mint) continue
         const key = entry?.pubkey || String(seen.size)
         seen.set(key, entry)
         const dec = entry?.account?.data?.parsed?.info?.tokenAmount?.decimals
@@ -108,7 +111,7 @@ async function fetchUsdcBalance(rpcUrl, owner) {
     if (seen.size === 0) {
       try {
         const { getAssociatedTokenAddress, PublicKey } = await import('@solana/spl-token')
-        const ata = await getAssociatedTokenAddress(new PublicKey(USDC_MINT), new PublicKey(owner), false)
+        const ata = await getAssociatedTokenAddress(new PublicKey(mint), new PublicKey(owner), false)
         const bal = await rpcMethod(rpcUrl, 'getTokenAccountBalance', [ata.toBase58()], 12000)
         const raw = bal?.value?.amount
         if (raw) total = BigInt(raw)
@@ -259,9 +262,10 @@ export async function handleExplorerAddress(req, res) {
   const rpcUrl = sanitizeRpcUrl(req.query.rpc) || DEFAULT_RPC
 
   try {
-    const [sol, usdc, rawTxs] = await Promise.all([
+    const [sol, usdc, xsa, rawTxs] = await Promise.all([
       fetchSolBalance(rpcUrl, address),
-      fetchUsdcBalance(rpcUrl, address),
+      fetchTokenBalance(rpcUrl, address, USDC_MINT),
+      fetchTokenBalance(rpcUrl, address, XSA_MINT),
       Promise.resolve(getCloudTxsForAddress(address)),
     ])
 
@@ -280,6 +284,7 @@ export async function handleExplorerAddress(req, res) {
       tokens: [
         { symbol: 'SOL', balance: sol, decimals: 9, icon: SOL_ICON, mint: null },
         { symbol: 'USDC', balance: usdc.amount, decimals: usdc.decimals, icon: USDC_ICON, mint: USDC_MINT },
+        { symbol: 'XSA', balance: xsa.amount, decimals: xsa.decimals, icon: XSA_ICON, mint: XSA_MINT },
       ],
       transactions,
       txCount: rawTxs.length,
@@ -337,14 +342,15 @@ export async function handleExplorerTx(req, res) {
       const delta = postAmt - preAmt
       if (delta === 0) continue
       const isUsdc = post.mint === USDC_MINT
+      const isXsa = post.mint === XSA_MINT
       tokenTransfers.push({
         amount: Math.abs(delta) / 10 ** (post.uiTokenAmount?.decimals || 6),
         decimals: post.uiTokenAmount?.decimals || 6,
         from: (delta < 0 ? post.owner : pre?.owner || post.owner) || '',
         to: (delta > 0 ? post.owner : pre?.owner || post.owner) || '',
         mint: post.mint,
-        symbol: isUsdc ? 'USDC' : null,
-        icon: isUsdc ? USDC_ICON : null,
+        symbol: isUsdc ? 'USDC' : isXsa ? 'XSA' : null,
+        icon: isUsdc ? USDC_ICON : isXsa ? XSA_ICON : null,
       })
     }
 
@@ -369,7 +375,11 @@ export async function handleExplorerTx(req, res) {
       memo: extractMemo(tx),
       tokenTransfers,
       solTransfers,
-      ...(normalizeAddress(req.query.address) ? parseUsdcTransaction(tx, signature, req.query.address) || { direction: 'other', amount: 0 } : {}),
+      ...(normalizeAddress(req.query.address)
+        ? parseUsdcTransaction(tx, signature, req.query.address, [], USDC_MINT)
+          || parseUsdcTransaction(tx, signature, req.query.address, [], XSA_MINT)
+          || { direction: 'other', amount: 0 }
+        : {}),
       fromCloud: false,
     })
   } catch (err) {

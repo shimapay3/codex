@@ -9,6 +9,7 @@ import UsdcAvatar from './UsdcAvatar'
 
 function AmountLine({ entry }: { entry: TxEntry }) {
   const sign = entry.direction === 'in' ? '+' : entry.direction === 'out' ? '−' : ''
+  const symbol = entry.tokenSymbol || 'USDC'
   const color =
     entry.status === 'failed'
       ? '#ff4d6d'
@@ -21,7 +22,7 @@ function AmountLine({ entry }: { entry: TxEntry }) {
     <span className="shrink-0 text-right">
       <span className="block text-[15px] font-semibold tabular-nums" style={{ color }}>
         {sign}
-        {formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} USDC
+        {formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} {symbol}
       </span>
       <span className="block text-[10.5px] text-[color:var(--muted)]">
         {entry.status === 'failed' ? 'Thất bại' : relativeTime(entry.blockTime)}
@@ -119,6 +120,7 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
   if (!entry) return null
 
   const parsed = splitMemo(entry.memo)
+  const symbol = entry.tokenSymbol || 'USDC'
   const totalUsd = formatUsd(entry.amount)
   const totalVnd = formatVnd(entry.amount * price.vnd)
   const contact = entry.counterparty ? contacts.find((c) => c.address === entry.counterparty) : null
@@ -137,7 +139,7 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
               Chi tiết giao dịch
             </p>
             <h3 className="mt-1 text-[17px] font-semibold">
-              {entry.direction === 'in' ? 'Nhận USDC' : entry.direction === 'out' ? 'Gửi USDC' : 'Giao dịch'}
+              {entry.direction === 'in' ? `Nhận ${symbol}` : entry.direction === 'out' ? `Gửi ${symbol}` : 'Giao dịch'}
             </h3>
           </div>
           <button
@@ -161,7 +163,7 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
           <div className="min-w-0 flex-1">
             <p className="text-[22px] font-bold tabular-nums leading-tight">
               {entry.direction === 'in' ? '+' : entry.direction === 'out' ? '−' : ''}
-              {formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} USDC
+              {formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} {symbol}
             </p>
             <p className="text-[12px] text-[color:var(--muted)]">
               ≈ {totalUsd} · {totalVnd}

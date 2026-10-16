@@ -1,5 +1,5 @@
 import UsdcAvatar from '../components/UsdcAvatar'
-import { SOL_ICON } from './solana'
+import { SOL_ICON, XSA_MINT } from './solana'
 
 /**
  * Coin registry — a single source of truth for every supported token.
@@ -9,7 +9,7 @@ import { SOL_ICON } from './solana'
  * `hasUsdValue` — whether the coin shows USD/VND conversion.
  * SOL and STAR are gas/utility tokens with no fixed USD value.
  */
-export type CoinId = 'usdc' | 'sol' | 'star'
+export type CoinId = 'usdc' | 'xsa' | 'sol' | 'star'
 
 export type CoinConfig = {
   id: CoinId
@@ -43,6 +43,19 @@ export const COINS: CoinConfig[] = [
     hasUsdValue: true,
     tagline: 'Stablecoin · 1 USDC ≈ 1 USD',
     quickAmounts: [1, 5, 10, 25, 50],
+    decimals: 6,
+    hasMemo: true,
+    enabled: true,
+  },
+  {
+    id: 'xsa',
+    name: 'XSA Token',
+    symbol: 'XSA',
+    icon: <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#6C5CE7]/20 text-[16px] font-bold text-[#a29bfe]">X</span>,
+    iconSm: <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#6C5CE7]/20 text-[10px] font-bold text-[#a29bfe]">X</span>,
+    hasUsdValue: true,
+    tagline: 'Token Cloud Chain · giá động',
+    quickAmounts: [1, 5, 10, 50, 100],
     decimals: 6,
     hasMemo: true,
     enabled: true,

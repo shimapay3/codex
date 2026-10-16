@@ -13,7 +13,7 @@ import {
   WifiOff,
 } from 'lucide-react'
 import { useWallet } from '../state/WalletProvider'
-import { TxEntry, formatAmount, formatSolBalance, SOL_ICON } from '../lib/solana'
+import { TxEntry, formatAmount, formatSolBalance, SOL_ICON, XSA_MINT } from '../lib/solana'
 import { formatUsd, formatVnd } from '../lib/format'
 import { shortAddress } from '../lib/crypto'
 import UsdcAvatar from '../components/UsdcAvatar'
@@ -29,6 +29,7 @@ export default function HomePage() {
   const {
     balance,
     price,
+    xsaPrice,
     history,
     historyLoading,
     prefs,
@@ -190,20 +191,26 @@ export default function HomePage() {
         <div className="space-y-2">
           {ENABLED_COINS.map((c) => {
             const isUsdc = c.id === 'usdc'
+            const isXsa = c.id === 'xsa'
             const isSol = c.id === 'sol'
-            const coinBalance = isUsdc ? balance.usdc : isSol ? balance.sol : 0
+            const coinBalance = isUsdc ? balance.usdc : isXsa ? balance.xsa : isSol ? balance.sol : 0
+            const coinPrice = isXsa ? xsaPrice : price
             const coinBalanceStr = isUsdc
               ? formatAmount(balance.usdc, 2)
-              : isSol
-                ? formatSolBalance(balance.sol)
-                : '0'
+              : isXsa
+                ? formatAmount(balance.xsa, 2)
+                : isSol
+                  ? formatSolBalance(balance.sol)
+                  : '0'
             const subLine = isUsdc
               ? (hidden ? '≈ ••••' : formatVnd(balance.usdc * price.vnd))
-              : isSol
-                ? (airdrop.status === 'pending' || airdrop.status === 'sending'
-                    ? 'Đang chờ airdrop…'
-                    : c.tagline)
-                : c.tagline
+              : isXsa
+                ? (hidden ? '≈ ••••' : formatVnd(balance.xsa * xsaPrice.vnd))
+                : isSol
+                  ? (airdrop.status === 'pending' || airdrop.status === 'sending'
+                      ? 'Đang chờ airdrop…'
+                      : c.tagline)
+                  : c.tagline
             return (
               <button
                 key={c.id}
@@ -221,6 +228,8 @@ export default function HomePage() {
                       </span>
                     ) : isUsdc ? (
                       <span className="font-mono text-[10px] break-all">{shortAddress(USDC_MINT, 8)}</span>
+                    ) : isXsa ? (
+                      <span className="font-mono text-[10px] break-all">{shortAddress(XSA_MINT, 8)}</span>
                     ) : (
                       c.tagline
                     )}
@@ -231,7 +240,7 @@ export default function HomePage() {
                     {hidden ? '••••' : coinBalanceStr}
                   </p>
                   <p className="text-[10.5px] text-[color:var(--muted)]">
-                    {c.hasUsdValue ? (hidden ? '≈ ••••' : formatVnd(coinBalance * price.vnd)) : '—'}
+                    {c.hasUsdValue ? (hidden ? '≈ ••••' : formatVnd(coinBalance * coinPrice.vnd)) : '—'}
                   </p>
                 </div>
               </button>

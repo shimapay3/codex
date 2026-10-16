@@ -16,7 +16,7 @@ import {
 import { useWallet } from '../state/WalletProvider'
 import { CATEGORIES, WISHES, buildMemo, categoryById } from '../lib/categories'
 import { isValidAddress, shortAddress } from '../lib/crypto'
-import { USDC_MINT, formatAmount, formatSolBalance, parseAmountInput, SOL_ICON } from '../lib/solana'
+import { USDC_MINT, XSA_MINT, formatAmount, formatSolBalance, parseAmountInput, SOL_ICON } from '../lib/solana'
 import { copyToClipboard, formatUsd, formatVnd } from '../lib/format'
 import { CoinConfig } from '../lib/coins'
 import SendConfirm from './SendConfirm'
@@ -31,6 +31,7 @@ export default function UnifiedSendForm({ coin }: Props) {
     sendSol,
     balance,
     price,
+    xsaPrice,
     contacts,
     wallets,
     activeWallet,
@@ -62,16 +63,20 @@ export default function UnifiedSendForm({ coin }: Props) {
   const [showSaveAfterQr, setShowSaveAfterQr] = useState(false)
 
   const isUsdc = coin.id === 'usdc'
+  const isXsa = coin.id === 'xsa'
   const isSol = coin.id === 'sol'
+  const isToken = isUsdc || isXsa
 
   // Balance and amount parsing per coin
-  const coinBalance = isUsdc ? balance.usdc : isSol ? balance.sol : 0
+  const coinBalance = isUsdc ? balance.usdc : isXsa ? balance.xsa : isSol ? balance.sol : 0
   const maxAmount = isUsdc
     ? Math.floor(balance.usdc * 1e6) / 1e6
-    : isSol
-      ? Math.max(0, balance.sol - 0.001)
-      : 0
-  const amount = isUsdc
+    : isXsa
+      ? Math.floor(balance.xsa * 1e6) / 1e6
+      : isSol
+        ? Math.max(0, balance.sol - 0.001)
+        : 0
+  const amount = isToken
     ? parseAmountInput(amountText, balance.decimals || 6)
     : Number.parseFloat(amountText.replace(/,/g, '.')) || 0
 
@@ -83,7 +88,7 @@ export default function UnifiedSendForm({ coin }: Props) {
   const validTo = isValidAddress(to) && to.trim() !== activeWallet?.address
   const category = categoryById(categoryId)
   const insufficient = amount > maxAmount
-  const noFeeBudget = isUsdc && balance.sol < 0.0005
+  const noFeeBudget = isToken && balance.sol < 0.0005
 
   const recipientLabel = useMemo(() => {
     const match = contacts.find((contact) => contact.address === to.trim())
@@ -119,8 +124,8 @@ export default function UnifiedSendForm({ coin }: Props) {
     try {
       setStage('sending')
       let sig: string
-      if (isUsdc) {
-        sig = await send({ to: to.trim(), amount, memo: memo || '', category: categoryId, wish })
+      if (isToken) {
+        sig = await send({ to: to.trim(), amount, memo: memo || '', category: categoryId, wish, mint: isXsa ? XSA_MINT : USDC_MINT })
       } else if (isSol) {
         sig = await sendSol({ to: to.trim(), amount, memo: note.trim() || undefined })
       } else {
@@ -281,7 +286,7 @@ export default function UnifiedSendForm({ coin }: Props) {
             {coin.iconSm} Số tiền gửi
           </span>
           <span className="text-[11px] text-[color:var(--muted)]">
-            Số dư {balance.loading ? '…' : isUsdc ? formatAmount(balance.usdc, 2) : isSol ? formatSolBalance(balance.sol) : '0'} {coin.symbol}
+            Số dư {balance.loading ? '…' : isUsdc ? formatAmount(balance.usdc, 2) : isXsa ? formatAmount(balance.xsa, 2) : isSol ? formatSolBalance(balance.sol) : '0'} {coin.symbol}
           </span>
         </div>
 
@@ -298,9 +303,9 @@ export default function UnifiedSendForm({ coin }: Props) {
 
         {coin.hasUsdValue && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[color:var(--muted)]">
-            <span>≈ {formatUsd(amount * price.usd)}</span>
-            <span>≈ {formatVnd(amount * price.vnd)}</span>
-            {price.fallback && <span className="text-[#ffb020]">(giá dự phòng)</span>}
+            <span>≈ {formatUsd(amount * (isXsa ? xsaPrice.usd : price.usd))}</span>
+            <span>≈ {formatVnd(amount * (isXsa ? xsaPrice.vnd : price.vnd))}</span>
+            {(isXsa ? xsaPrice.fallback : price.fallback) && <span className="text-[#ffb020]">(giá dự phòng)</span>}
           </div>
         )}
 
@@ -448,7 +453,7 @@ export default function UnifiedSendForm({ coin }: Props) {
       </div>
 
       {/* Memo builder (for coins with memo support) */}
-      {coin.hasMemo && isUsdc && (
+      {coin.hasMemo && isToken && (
         <div className="rounded-[24px] glass p-4">
           <p className="mb-3 flex items-center gap-1.5 text-[12px] font-semibold text-[color:var(--muted)]">
             <Sparkles size={14} className="accent-text" /> Danh mục & lời chúc
@@ -498,8 +503,8 @@ export default function UnifiedSendForm({ coin }: Props) {
         </div>
       )}
 
-      {/* Simple note for non-USDC coins with memo */}
-      {coin.hasMemo && !isUsdc && (
+      {/* Simple note for non-token coins with memo */}
+      {coin.hasMemo && !isToken && (
         <div className="rounded-[24px] glass p-4">
           <input
             value={note}
@@ -511,8 +516,8 @@ export default function UnifiedSendForm({ coin }: Props) {
         </div>
       )}
 
-      {/* Memo preview (USDC only) */}
-      {coin.hasMemo && isUsdc && memo && (
+      {/* Memo preview (token coins only) */}
+      {coin.hasMemo && isToken && memo && (
         <div
           className="rounded-[24px] p-4"
           style={{
@@ -620,7 +625,7 @@ export default function UnifiedSendForm({ coin }: Props) {
       <p className="px-1 text-[10.5px] leading-relaxed text-[color:var(--muted)]">
         {coin.name} · {prefs.rpcUrl.replace(/^https?:\/\//, '')}
       </p>
-      {isUsdc && <p className="px-1 font-mono text-[9.5px] break-all text-[color:var(--muted)]">{USDC_MINT}</p>}
+      {isToken && <p className="px-1 font-mono text-[9.5px] break-all text-[color:var(--muted)]">{isXsa ? XSA_MINT : USDC_MINT}</p>}
 
       {confirming && (
         <SendConfirm
@@ -645,7 +650,7 @@ export default function UnifiedSendForm({ coin }: Props) {
           >
             <p className="text-[15px] font-semibold">Xác nhận gửi tối đa?</p>
             <p className="mt-2 text-[12.5px] leading-relaxed text-[color:var(--muted)]">
-              {isUsdc
+              {isToken
                 ? `Bạn sẽ gửi toàn bộ số dư ${formatAmount(maxAmount, 2)} ${coin.symbol}. Sau giao dịch, ví sẽ không còn ${coin.symbol}.`
                 : `Bạn sẽ gửi tối đa ${maxAmount.toLocaleString('vi-VN', { maximumFractionDigits: 6 })} ${coin.symbol} (giữ lại ≈ 0,001 SOL cho phí).`}
             </p>
@@ -660,7 +665,7 @@ export default function UnifiedSendForm({ coin }: Props) {
               <button
                 type="button"
                 onClick={() => {
-                  setAmountText(String(isUsdc ? maxAmount : Math.floor(maxAmount * 1e9) / 1e9))
+                  setAmountText(String(isToken ? maxAmount : Math.floor(maxAmount * 1e9) / 1e9))
                   setMaxPending(false)
                 }}
                 className="rounded-2xl accent-gradient py-3.5 text-[13px] font-semibold text-white"
