@@ -460,7 +460,7 @@ function TxView({ result }: { result: TxResult }) {
             Số dư USDC
           </p>
           <p className="mt-1 text-[14px] font-bold tabular-nums" style={{ color: result.direction === 'in' ? '#22e07a' : result.direction === 'out' ? 'var(--accent)' : 'var(--text)' }}>
-            {result.direction === 'in' ? '+' : result.direction === 'out' ? '−' : ''}
+            {result.direction === 'in' ? '−' : result.direction === 'out' ? '−' : ''}
             {formatAmount(result.tokenTransfers.filter((t) => t.mint === USDC_MINT).reduce((s, t) => s + t.amount, 0), 2)}{' '}
             <span className="text-[11px] text-[color:var(--muted)]">USDC</span>
           </p>
@@ -470,7 +470,7 @@ function TxView({ result }: { result: TxResult }) {
             Số dư SOL
           </p>
           <p className="mt-1 text-[14px] font-bold tabular-nums" style={{ color: result.direction === 'in' ? '#22e07a' : result.direction === 'out' ? 'var(--accent)' : 'var(--text)' }}>
-            {result.direction === 'in' ? '+' : '−'}
+            {result.direction === 'in' ? '−' : '−'}
             {formatAmount(result.fee + result.solTransfers.reduce((s, t) => s + t.amount, 0), 9)}{' '}
             <span className="text-[11px] text-[color:var(--muted)]">SOL</span>
           </p>

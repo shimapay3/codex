@@ -8,7 +8,7 @@ import { sendWebhook, isWebhookSent, markWebhookSent, buildTxMessage } from '../
 import UsdcAvatar from './UsdcAvatar'
 
 function AmountLine({ entry }: { entry: TxEntry }) {
-  const sign = entry.direction === 'in' ? '+' : entry.direction === 'out' ? '−' : ''
+  const sign = entry.direction === 'in' ? '−' : entry.direction === 'out' ? '−' : ''
   const color =
     entry.status === 'failed'
       ? '#ff4d6d'
@@ -160,7 +160,7 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
           <UsdcAvatar size={46} />
           <div className="min-w-0 flex-1">
             <p className="text-[22px] font-bold tabular-nums leading-tight">
-              {entry.direction === 'in' ? '+' : entry.direction === 'out' ? '−' : ''}
+              {entry.direction === 'in' ? '−' : entry.direction === 'out' ? '−' : ''}
               {formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} USDC
             </p>
             <p className="text-[12px] text-[color:var(--muted)]">

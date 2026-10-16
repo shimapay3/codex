@@ -852,11 +852,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (prefs.sound) ringIncoming()
       vibrate([90, 60, 90])
       if (prefs.notifications) {
-        showSystemNotification(`+${amount} USDC đã nhận`, body, entry.signature)
+        showSystemNotification(`−${amount} USDC đã nhận`, body, entry.signature)
       }
       pushToast({
         tone: 'payment',
-        title: `+${amount} USDC đã nhận`,
+        title: `−${amount} USDC đã nhận`,
         body,
         signature: entry.signature,
       })
