@@ -8,7 +8,7 @@ import { sendWebhook, isWebhookSent, markWebhookSent, buildTxMessage } from '../
 import UsdcAvatar from './UsdcAvatar'
 
 function AmountLine({ entry }: { entry: TxEntry }) {
-  const sign = entry.direction === 'in' ? '−' : entry.direction === 'out' ? '−' : ''
+  const sign = entry.direction === 'in' ? '+' : entry.direction === 'out' ? '−' : ''
   const color =
     entry.status === 'failed'
       ? '#ff4d6d'
@@ -160,7 +160,7 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
           <UsdcAvatar size={46} />
           <div className="min-w-0 flex-1">
             <p className="text-[22px] font-bold tabular-nums leading-tight">
-              {entry.direction === 'in' ? '−' : entry.direction === 'out' ? '−' : ''}
+              {entry.direction === 'in' ? '+' : entry.direction === 'out' ? '−' : ''}
               {formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} USDC
             </p>
             <p className="text-[12px] text-[color:var(--muted)]">
@@ -189,7 +189,7 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
 
         <dl className="space-y-2.5 text-[12.5px]">
           {[
-            { label: 'Trạng thái', value: entry.status === 'failed' ? 'Thất bại' : 'Thành công' },
+            { label: 'Trạng thái', value: entry.status === 'pending' ? 'Đang chờ xác nhận' : entry.status === 'failed' ? 'Thất bại' : 'Thành công' },
             { label: 'Thời gian', value: fullDateTime(entry.blockTime) },
             { label: 'Slot', value: String(entry.slot) },
             {
@@ -294,8 +294,9 @@ export default function TxList({
 }) {
   const [page, setPage] = useState(0)
 
-  // Reset to first page when entries change (filter/search)
-  useEffect(() => { setPage(0) }, [entries])
+  // Polling can refresh values without changing the result set or the current page.
+  const resultSignatures = entries.map((entry) => entry.signature).join(',')
+  useEffect(() => { setPage(0) }, [resultSignatures])
 
   const list = limit ? entries.slice(0, limit) : entries
   const paginated = limit ? list : list.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)

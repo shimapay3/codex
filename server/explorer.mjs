@@ -1,5 +1,6 @@
 import { rpcMethod, sanitizeRpcUrl, DEFAULT_RPC } from './rpc.mjs'
 import { getState, save } from './store.mjs'
+import { projectWalletTx, mergeTransactions, parseUsdcTransaction } from './tx-history.mjs'
 
 /**
  * Explorer API — serves chain.localusd.cloud.
@@ -35,6 +36,7 @@ function lamportsToSol(lamports) {
  */
 export function normalizeCloudTxAmount(tx) {
   if (!tx) return tx
+  tx = { ...tx } // Read-time formatting must not mutate the canonical record.
   const isSol = tx.tokenSymbol === 'SOL'
   if (!isSol && tx.decimals != null && tx.decimals !== USDC_DECIMALS) {
     tx.decimals = USDC_DECIMALS
@@ -123,7 +125,9 @@ async function fetchUsdcBalance(rpcUrl, owner) {
 export function getCloudTxsForAddress(address) {
   const state = getState()
   const txIndex = state.txIndex || { byAddress: {}, bySignature: {} }
-  const sigs = txIndex.byAddress[address] || []
+  const sigs = [...new Set([...(txIndex.byAddress[address] || []),
+    ...Object.values(txIndex.bySignature).filter((tx) => tx.walletAddress === address || tx.counterparty === address).map((tx) => tx.signature),
+  ])]
   const records = sigs
     .map((sig) => txIndex.bySignature[sig])
     .filter(Boolean)
@@ -168,35 +172,22 @@ export function saveCloudTx(telegramId, tx) {
   if (!state.txIndex) state.txIndex = { byAddress: {}, bySignature: {} }
   const txIndex = state.txIndex
 
-  // Store by signature (dedup — don't add the same sig twice)
-  if (!txIndex.bySignature[tx.signature]) {
-    txIndex.bySignature[tx.signature] = tx
-
-    // Index by wallet address (sender)
-    if (tx.walletAddress) {
-      if (!txIndex.byAddress[tx.walletAddress]) txIndex.byAddress[tx.walletAddress] = []
-      if (!txIndex.byAddress[tx.walletAddress].includes(tx.signature)) {
-        txIndex.byAddress[tx.walletAddress].push(tx.signature)
-      }
-    }
-    // Index by counterparty (receiver)
-    if (tx.counterparty) {
-      if (!txIndex.byAddress[tx.counterparty]) txIndex.byAddress[tx.counterparty] = []
-      if (!txIndex.byAddress[tx.counterparty].includes(tx.signature)) {
-        txIndex.byAddress[tx.counterparty].push(tx.signature)
-      }
-    }
+  const existing = txIndex.bySignature[tx.signature]
+  const reported = existing ? projectWalletTx(tx, existing.walletAddress) : tx
+  const record = mergeTransactions(existing ? [existing] : [], reported ? [reported] : [])[0]
+  if (!record) return
+  txIndex.bySignature[tx.signature] = record
+  for (const address of [record.walletAddress, record.counterparty].filter(Boolean)) {
+    if (!txIndex.byAddress[address]) txIndex.byAddress[address] = []
+    if (!txIndex.byAddress[address].includes(tx.signature)) txIndex.byAddress[address].push(tx.signature)
   }
 
-  // Also store in user's txHistory
   if (telegramId) {
     if (!state.users) state.users = {}
-    if (!state.users[telegramId]) state.users[telegramId] = { contacts: [], prefs: null, samples: [], txHistory: [] }
-    if (!state.users[telegramId].txHistory) state.users[telegramId].txHistory = []
-    if (!state.users[telegramId].txHistory.some((t) => t.signature === tx.signature)) {
-      state.users[telegramId].txHistory.push(tx)
-      state.users[telegramId].updatedAt = Date.now()
-    }
+    if (!state.users[telegramId]) state.users[telegramId] = { contacts: [], prefs: null, samples: [] }
+    const user = state.users[telegramId]
+    user.txHistory = mergeTransactions(user.txHistory || [], [record])
+    user.updatedAt = Date.now()
   }
 
   save()
@@ -279,16 +270,9 @@ export async function handleExplorerAddress(req, res) {
     // - counterparty  === address → 'in'  (this address received)
     // Also apply fee estimate for pruned transactions.
     const estFee = estimateFeeFromCloudTxs(rawTxs)
-    const transactions = rawTxs.slice(0, 50).map((tx) => {
-      const fee = tx.fee != null && tx.fee > 0 ? tx.fee : estFee
-      if (tx.counterparty === address && tx.walletAddress !== address) {
-        return { ...tx, direction: 'in', counterparty: tx.walletAddress, fee }
-      }
-      if (tx.walletAddress === address && tx.counterparty !== address) {
-        return { ...tx, direction: 'out', fee }
-      }
-      return { ...tx, fee }
-    })
+    const transactions = rawTxs.map((tx) => projectWalletTx(tx, address)).filter(Boolean).map((tx) => ({
+      ...tx, fee: tx.fee != null && tx.fee > 0 ? tx.fee : estFee,
+    }))
 
     res.json({
       address,
@@ -323,7 +307,9 @@ export async function handleExplorerTx(req, res) {
       const allTxs = getCloudTxsForAddress(cloudTx.walletAddress || '')
       cloudTx.fee = estimateFeeFromCloudTxs(allTxs)
     }
-    res.json({ ...cloudTx, fromCloud: true })
+    const address = normalizeAddress(req.query.address)
+    const viewed = address ? projectWalletTx(cloudTx, address) : cloudTx
+    res.json({ ...(viewed || { ...cloudTx, direction: 'other' }), fromCloud: true })
     return
   }
 
@@ -383,9 +369,47 @@ export async function handleExplorerTx(req, res) {
       memo: extractMemo(tx),
       tokenTransfers,
       solTransfers,
+      ...(normalizeAddress(req.query.address) ? parseUsdcTransaction(tx, signature, req.query.address) || { direction: 'other', amount: 0 } : {}),
       fromCloud: false,
     })
   } catch (err) {
     res.status(500).json({ error: 'Lookup failed', detail: err?.message })
   }
+}
+
+/** Rebuild derived indexes from both surviving stores; no amount or signature is rewritten. */
+export function repairTransactionIndex() {
+  const state = getState()
+  const old = state.txIndex || { bySignature: {}, byAddress: {} }
+  const records = mergeTransactions(
+    ...Object.values(state.users || {}).map((u) => u.txHistory || []),
+    Object.values(old.bySignature || {}),
+  ).filter((tx) => tx?.signature && tx.walletAddress)
+  const bySignature = Object.fromEntries(records.map((tx) => [tx.signature, tx]))
+  const byAddress = {}
+  for (const tx of records) {
+    for (const address of new Set([tx.walletAddress, tx.counterparty].filter(Boolean))) {
+      if (!byAddress[address]) byAddress[address] = []
+      byAddress[address].push(tx.signature)
+    }
+  }
+  const repaired = { bySignature, byAddress }
+  let changed = JSON.stringify(old) !== JSON.stringify(repaired)
+  let recoveredUserRecords = 0
+  state.txIndex = repaired
+  // Only explicit Telegram-device wallet registrations establish ownership.
+  for (const [id, user] of Object.entries(state.users || {})) {
+    const addresses = new Set(state.wallets?.devices?.[`tg-${id}`]?.addresses || [])
+    if (!addresses.size) continue
+    const previous = user.txHistory || []
+    const recovered = records.filter((tx) => addresses.has(tx.walletAddress) || addresses.has(tx.counterparty))
+    const merged = mergeTransactions(previous, recovered)
+    if (JSON.stringify(previous) !== JSON.stringify(merged)) {
+      recoveredUserRecords += merged.length - previous.length
+      user.txHistory = merged
+      changed = true
+    }
+  }
+  if (changed) save()
+  return { records: records.length, addresses: Object.keys(byAddress).length, recoveredUserRecords }
 }

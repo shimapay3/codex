@@ -53,14 +53,15 @@ export function useRealtimePoll({ rpcUrl, address, priceEndpoint, telegramId, en
         })
         if (cancelled || !res.ok) return
         const data: SyncResponse = await res.json()
-        handler.current(data)
+        if (!cancelled && data.address === address) handler.current(data)
       } catch {
         /* network hiccup — next tick retries */
+      } finally {
+        if (!cancelled) timer = window.setTimeout(poll, 5000)
       }
     }
 
     void poll()
-    timer = window.setInterval(poll, 5000)
 
     return () => {
       cancelled = true

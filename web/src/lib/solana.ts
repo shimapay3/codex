@@ -12,7 +12,7 @@ import {
   createTransferCheckedInstruction,
   getAssociatedTokenAddress,
 } from '@solana/spl-token'
-import bs58 from 'bs58'
+import { getTelegramUserIdString } from './telegram'
 
 /** Cloud Chain USDC token — the single supported asset of Cloud Pay Wallet. */
 export const USDC_MINT = 'USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2'
@@ -377,33 +377,6 @@ export type TxEntry = {
   explorerUrl: string
 }
 
-function decodeMemoInstruction(instruction: any): string | null {
-  try {
-    const program = instruction?.program || instruction?.programId
-    if (program === 'spl-memo' || program === MEMO_PROGRAM_ID.toBase58()) {
-      if (typeof instruction.parsed === 'string') return instruction.parsed
-      if (typeof instruction.parsed === 'object' && instruction.parsed?.info) {
-        return String(instruction.parsed.info)
-      }
-    }
-    return null
-  } catch {
-    return null
-  }
-}
-
-function decodeMemoFromRaw(instruction: any): string | null {
-  try {
-    const programId = instruction?.programId
-    if (!programId || programId !== MEMO_PROGRAM_ID.toBase58()) return null
-    const data = instruction?.data
-    if (typeof data !== 'string') return null
-    return Buffer.from(bs58.decode(data)).toString('utf8')
-  } catch {
-    return null
-  }
-}
-
 /**
  * Explorer URLs always use the fixed Cloud Chain customUrl (localusd.cloud).
  * The rpcUrl parameter is kept for API compatibility but the customUrl is
@@ -453,128 +426,23 @@ export async function registerWalletWithServer(deviceId: string, address: string
   }
 }
 
-function extractMemo(tx: any): string {
-  const lists = [
-    tx?.transaction?.message?.instructions || [],
-    ...(tx?.meta?.innerInstructions || []).map((inner: any) => inner?.instructions || []),
-  ]
-  for (const list of lists) {
-    for (const instruction of list) {
-      const memo = decodeMemoInstruction(instruction) || decodeMemoFromRaw(instruction)
-      if (memo) return memo.trim()
-    }
-  }
-  return ''
-}
-
+/** Manual refresh and realtime polling must use the same merged, wallet-relative history. */
 export async function fetchTokenHistory(
   rpcUrl: string,
   owner: string,
   mint = USDC_MINT,
-  limit = 25,
+  limit?: number,
 ): Promise<TxEntry[]> {
-  // Token-2022 signatures are indexed by the Associated Token Account address,
-  // not the owner's system account. Resolve the ATA first so sent transactions
-  // appear in the history.
-  let queryAddress = owner
-  try {
-    const ata = await getAssociatedTokenAddress(
-      new PublicKey(mint),
-      new PublicKey(owner),
-      false,
-      USDC_TOKEN_PROGRAM,
-    )
-    queryAddress = ata.toBase58()
-  } catch {
-    // Fallback to owner address if ATA resolution fails
-  }
-
-  let signatures = await rpcFetch<any[]>(rpcUrl, 'getSignaturesForAddress', [
-    queryAddress,
-    { limit },
-  ])
-
-  // Fallback: if ATA query returns nothing, try the owner's system account.
-  // Some RPC nodes don't index Token-2022 activity by the ATA address.
-  if ((!Array.isArray(signatures) || signatures.length === 0) && queryAddress !== owner) {
-    try {
-      const ownerSigs = await rpcFetch<any[]>(rpcUrl, 'getSignaturesForAddress', [
-        owner,
-        { limit },
-      ])
-      if (Array.isArray(ownerSigs) && ownerSigs.length > 0) {
-        signatures = ownerSigs
-      }
-    } catch {
-      /* keep empty result */
-    }
-  }
-
-  if (!Array.isArray(signatures) || signatures.length === 0) return []
-
-  const entries = await Promise.all(
-    signatures.map(async (item) => {
-      try {
-        const tx = await rpcFetch<any>(
-          rpcUrl,
-          'getTransaction',
-          [
-            item.signature,
-            { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' },
-          ],
-          20000,
-        )
-        if (!tx) return null
-
-        const decimals =
-          tx?.meta?.postTokenBalances?.find((b: any) => b.mint === mint)?.uiTokenAmount
-            ?.decimals ??
-          tx?.meta?.preTokenBalances?.find((b: any) => b.mint === mint)?.uiTokenAmount?.decimals ??
-          USDC_DECIMALS_FALLBACK
-
-        const mine = (list: any[]) =>
-          (list || []).filter((b) => b.mint === mint && b.owner === owner)
-
-        const sum = (list: any[]) =>
-          list.reduce((acc, b) => acc + Number(b.uiTokenAmount?.uiAmountString || 0), 0)
-
-        const before = sum(mine(tx?.meta?.preTokenBalances))
-        const after = sum(mine(tx?.meta?.postTokenBalances))
-        const delta = after - before
-
-        const others = (tx?.meta?.postTokenBalances || []).filter(
-          (b: any) => b.mint === mint && b.owner && b.owner !== owner,
-        )
-        const counterparty = others[0]?.owner ?? null
-
-        const direction: TxEntry['direction'] =
-          Math.abs(delta) < 1e-9 ? 'other' : delta > 0 ? 'in' : 'out'
-
-        return {
-          signature: item.signature,
-          slot: item.slot,
-          blockTime: item.blockTime ?? tx?.blockTime ?? null,
-          direction,
-          amount: Math.abs(delta),
-          decimals,
-          fee: (tx?.meta?.fee || 0) / 1_000_000_000,
-          status: item.err || tx?.meta?.err ? 'failed' : 'success',
-          memo: extractMemo(tx),
-          counterparty,
-          explorerUrl: explorerTxUrl(item.signature, rpcUrl),
-        } satisfies TxEntry
-      } catch {
-        return null
-      }
-    }),
-  )
-
-  // Filter out transactions with zero USDC delta — these are SOL transfers
-  // (e.g. airdrop) or other non-USDC transactions that should not appear
-  // in the USDC activity list.
-  return (entries.filter(Boolean) as TxEntry[]).filter(
-    (entry) => entry.amount > 0 || entry.direction === 'self',
-  )
+  if (mint !== USDC_MINT) return []
+  const res = await fetch('/api/sync', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ address: owner, rpcUrl, telegramId: getTelegramUserIdString() }),
+  })
+  if (!res.ok) throw new Error('Không tải được lịch sử giao dịch')
+  const data = await res.json()
+  const entries: TxEntry[] = Array.isArray(data.transactions) ? data.transactions : []
+  return limit == null ? entries : entries.slice(0, limit)
 }
 
 export async function fetchTransactionSummary(
@@ -583,42 +451,13 @@ export async function fetchTransactionSummary(
   owner: string,
   mint = USDC_MINT,
 ): Promise<TxEntry | null> {
+  if (mint !== USDC_MINT) return null
   try {
-    const tx = await rpcFetch<any>(
-      rpcUrl,
-      'getTransaction',
-      [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }],
-      20000,
-    )
-    if (!tx) return null
-
-    const decimals =
-      tx?.meta?.postTokenBalances?.find((b: any) => b.mint === mint)?.uiTokenAmount?.decimals ??
-      USDC_DECIMALS_FALLBACK
-
-    const sum = (list: any[]) =>
-      (list || [])
-        .filter((b) => b.mint === mint && b.owner === owner)
-        .reduce((acc, b) => acc + Number(b.uiTokenAmount?.uiAmountString || 0), 0)
-
-    const delta = sum(tx?.meta?.postTokenBalances) - sum(tx?.meta?.preTokenBalances)
-    const others = (tx?.meta?.postTokenBalances || []).filter(
-      (b: any) => b.mint === mint && b.owner && b.owner !== owner,
-    )
-
-    return {
-      signature,
-      slot: tx.slot,
-      blockTime: tx.blockTime ?? null,
-      direction: Math.abs(delta) < 1e-9 ? 'other' : delta > 0 ? 'in' : 'out',
-      amount: Math.abs(delta),
-      decimals,
-      fee: (tx?.meta?.fee || 0) / 1_000_000_000,
-      status: tx?.meta?.err ? 'failed' : 'success',
-      memo: extractMemo(tx),
-      counterparty: others[0]?.owner ?? null,
-      explorerUrl: explorerTxUrl(signature, rpcUrl),
-    }
+    const res = await fetch(`/api/explorer/tx/${encodeURIComponent(signature)}?rpc=${encodeURIComponent(rpcUrl)}&address=${encodeURIComponent(owner)}`)
+    if (!res.ok) return null
+    const tx = await res.json()
+    if (tx.amount == null || !tx.direction) return null
+    return { ...tx, explorerUrl: explorerTxUrl(signature, rpcUrl) } as TxEntry
   } catch {
     return null
   }

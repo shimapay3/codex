@@ -45,6 +45,7 @@ type TxResult = {
   status: 'success' | 'failed'
   memo: string
   direction?: 'in' | 'out' | 'self' | 'other'
+  amount?: number
   tokenTransfers: Array<{
     amount: number
     decimals: number
@@ -91,11 +92,11 @@ async function lookupAddress(rpcUrl: string, address: string): Promise<AddressRe
   }
 }
 
-async function lookupTx(rpcUrl: string, signature: string): Promise<TxResult> {
+async function lookupTx(rpcUrl: string, signature: string, owner?: string): Promise<TxResult> {
   // 1. Try cloud DB API first (checks txIndex, then falls back to RPC server-side)
   try {
     const res = await fetch(
-      `/api/explorer/tx/${encodeURIComponent(signature)}?rpc=${encodeURIComponent(rpcUrl)}`,
+      `/api/explorer/tx/${encodeURIComponent(signature)}?rpc=${encodeURIComponent(rpcUrl)}${owner ? `&address=${encodeURIComponent(owner)}` : ''}`,
     )
     if (res.ok) {
       const data = await res.json()
@@ -108,7 +109,10 @@ async function lookupTx(rpcUrl: string, signature: string): Promise<TxResult> {
           fee: data.fee ?? 0.000005,
           status: (data.status as 'success' | 'failed') || 'success',
           memo: data.memo || '',
-          direction: data.direction,
+          amount: data.amount,
+          direction: owner && data.counterparty === owner && data.walletAddress !== owner
+            ? (data.direction === 'out' ? 'in' : data.direction === 'in' ? 'out' : data.direction)
+            : data.direction,
           tokenTransfers: (data.tokenTransfers && data.tokenTransfers.length > 0)
             ? data.tokenTransfers.map((t: any) => ({
                 amount: t.amount,
@@ -232,7 +236,7 @@ export default function ExplorerFrame({ initialQuery = '' }: Props) {
       setError(null)
       try {
         if (trimmed.length > 60) {
-          const r = await lookupTx(rpcUrl, trimmed)
+          const r = await lookupTx(rpcUrl, trimmed, activeWallet?.address)
           setResult(r)
         } else if (isValidAddress(trimmed)) {
           const r = await lookupAddress(rpcUrl, trimmed)
@@ -248,7 +252,7 @@ export default function ExplorerFrame({ initialQuery = '' }: Props) {
         setLoading(false)
       }
     },
-    [rpcUrl],
+    [rpcUrl, activeWallet?.address],
   )
 
   // Auto-lookup when query changes (debounced)
@@ -460,8 +464,8 @@ function TxView({ result }: { result: TxResult }) {
             Số dư USDC
           </p>
           <p className="mt-1 text-[14px] font-bold tabular-nums" style={{ color: result.direction === 'in' ? '#22e07a' : result.direction === 'out' ? 'var(--accent)' : 'var(--text)' }}>
-            {result.direction === 'in' ? '−' : result.direction === 'out' ? '−' : ''}
-            {formatAmount(result.tokenTransfers.filter((t) => t.mint === USDC_MINT).reduce((s, t) => s + t.amount, 0), 2)}{' '}
+            {result.direction === 'in' ? '+' : result.direction === 'out' ? '−' : ''}
+            {formatAmount(result.amount ?? result.tokenTransfers.filter((t) => t.mint === USDC_MINT).reduce((s, t) => s + t.amount, 0), 2)}{' '}
             <span className="text-[11px] text-[color:var(--muted)]">USDC</span>
           </p>
         </div>
@@ -470,7 +474,7 @@ function TxView({ result }: { result: TxResult }) {
             Số dư SOL
           </p>
           <p className="mt-1 text-[14px] font-bold tabular-nums" style={{ color: result.direction === 'in' ? '#22e07a' : result.direction === 'out' ? 'var(--accent)' : 'var(--text)' }}>
-            {result.direction === 'in' ? '−' : '−'}
+            {'−'}
             {formatAmount(result.fee + result.solTransfers.reduce((s, t) => s + t.amount, 0), 9)}{' '}
             <span className="text-[11px] text-[color:var(--muted)]">SOL</span>
           </p>

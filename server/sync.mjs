@@ -1,6 +1,9 @@
 import { rpcMethod, sanitizeRpcUrl, DEFAULT_RPC } from './rpc.mjs'
+import { PublicKey } from '@solana/web3.js'
+import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token'
+import { projectWalletTx, mergeTransactions, fetchRpcHistory } from './tx-history.mjs'
 import { getState } from './store.mjs'
-import { getUserCloudTxHistory, getCloudTxsForAddress, updateCloudTxStatus, normalizeCloudTxAmount, estimateFeeFromCloudTxs } from './explorer.mjs'
+import { getUserCloudTxHistory, getCloudTxsForAddress, updateCloudTxStatus, estimateFeeFromCloudTxs } from './explorer.mjs'
 
 /**
  * Unified sync endpoint — the single realtime API the client polls every 5 s.
@@ -17,14 +20,6 @@ import { getUserCloudTxHistory, getCloudTxsForAddress, updateCloudTxStatus, norm
 
 const USDC_MINT = 'USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2'
 const TOKEN_2022 = 'TokenzQdBNbLqP5VEhPkASv1L5Xuo6YHuHD4qLm9Q'
-
-const EXPLORER_BASE = 'https://chain.localusd.cloud'
-const EXPLORER_CUSTOM_URL = 'https://rpc.localusd.cloud'
-
-function explorerTxUrl(signature) {
-  const params = new URLSearchParams({ cluster: 'custom', customUrl: EXPLORER_CUSTOM_URL })
-  return `${EXPLORER_BASE}/tx/${signature}?${params.toString()}`
-}
 
 const FIXED_USD = 1
 const FIXED_VND = 30000
@@ -134,8 +129,7 @@ async function fetchUsdcBalance(rpcUrl, owner) {
 
     if (seen.size === 0) {
       try {
-        const { getAssociatedTokenAddress, PublicKey } = await import('@solana/spl-token')
-        const ata = await getAssociatedTokenAddress(new PublicKey(USDC_MINT), new PublicKey(owner), false)
+        const ata = await getAssociatedTokenAddress(new PublicKey(USDC_MINT), new PublicKey(owner), false, TOKEN_2022_PROGRAM_ID)
         const bal = await rpcMethod(rpcUrl, 'getTokenAccountBalance', [ata.toBase58()], 12000)
         const raw = bal?.value?.amount
         if (raw) total = BigInt(raw)
@@ -162,99 +156,17 @@ async function fetchSolBalance(rpcUrl, owner) {
   }
 }
 
-async function fetchRecentTxs(rpcUrl, owner, limit = 15) {
-  try {
-    // Token-2022 signatures are indexed by the Associated Token Account
-    // address, not the owner's system account. Resolve the ATA first so
-    // sent transactions appear in the history.
-    let queryAddress = owner
-    try {
-      const { getAssociatedTokenAddress, PublicKey } = await import('@solana/spl-token')
-      const ata = await getAssociatedTokenAddress(
-        new PublicKey(USDC_MINT),
-        new PublicKey(owner),
-        false,
-        new PublicKey(TOKEN_2022),
-      )
-      queryAddress = ata.toBase58()
-    } catch {
-      // Fallback to owner address if ATA resolution fails
-    }
-
-    let signatures = await rpcMethod(rpcUrl, 'getSignaturesForAddress', [queryAddress, { limit }])
-
-    // Fallback: if ATA query returns nothing, try the owner's system account.
-    // Some RPC nodes don't index Token-2022 activity by the ATA address.
-    if ((!Array.isArray(signatures) || signatures.length === 0) && queryAddress !== owner) {
-      try {
-        const ownerSigs = await rpcMethod(rpcUrl, 'getSignaturesForAddress', [owner, { limit }])
-        if (Array.isArray(ownerSigs) && ownerSigs.length > 0) {
-          signatures = ownerSigs
-        }
-      } catch {
-        /* keep empty result */
-      }
-    }
-
-    if (!Array.isArray(signatures) || signatures.length === 0) return []
-
-    const entries = await Promise.all(
-      signatures.slice(0, limit).map(async (item) => {
-        try {
-          const tx = await rpcMethod(rpcUrl, 'getTransaction', [
-            item.signature,
-            { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' },
-          ], 20000)
-          if (!tx) return null
-
-          const decimals =
-            tx?.meta?.postTokenBalances?.find((b) => b.mint === USDC_MINT)?.uiTokenAmount?.decimals ??
-            tx?.meta?.preTokenBalances?.find((b) => b.mint === USDC_MINT)?.uiTokenAmount?.decimals ?? 6
-
-          const mine = (list) => (list || []).filter((b) => b.mint === USDC_MINT && b.owner === owner)
-          const sum = (list) => list.reduce((acc, b) => acc + Number(b.uiTokenAmount?.uiAmountString || 0), 0)
-          const delta = sum(mine(tx?.meta?.postTokenBalances)) - sum(mine(tx?.meta?.preTokenBalances))
-          const others = (tx?.meta?.postTokenBalances || []).filter((b) => b.mint === USDC_MINT && b.owner && b.owner !== owner)
-
-          let memo = ''
-          for (const list of [tx?.transaction?.message?.instructions || [], ...(tx?.meta?.innerInstructions || []).map((i) => i?.instructions || [])]) {
-            for (const ix of list) {
-              const prog = ix?.program || ix?.programId
-              if (prog === 'spl-memo' || prog === 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr') {
-                if (typeof ix.parsed === 'string') memo = ix.parsed.trim()
-                else if (ix.parsed?.info) memo = String(ix.parsed.info).trim()
-              }
-            }
-          }
-
-          const direction = Math.abs(delta) < 1e-9 ? 'other' : delta > 0 ? 'in' : 'out'
-
-          // Phí SOL thực từ validator (lamports → SOL)
-          const fee = lamportsToSol(tx?.meta?.fee || 0)
-
-          return {
-            signature: item.signature,
-            slot: item.slot,
-            blockTime: item.blockTime ?? tx?.blockTime ?? null,
-            direction,
-            amount: Math.abs(delta),
-            decimals,
-            fee,
-            status: item.err || tx?.meta?.err ? 'failed' : 'success',
-            memo,
-            counterparty: others[0]?.owner ?? null,
-            explorerUrl: explorerTxUrl(item.signature),
-          }
-        } catch {
-          return null
-        }
-      }),
-    )
-
-    return (entries.filter(Boolean)).filter((e) => e.amount > 0 || e.direction === 'self')
-  } catch {
-    return []
-  }
+/** Cloud history supplements RPC, never prevents it from being queried. */
+export async function getWalletTransactions(rpcUrl, address, telegramId) {
+  const userTxs = telegramId ? getUserCloudTxHistory(telegramId, address) : []
+  const indexTxs = getCloudTxsForAddress(address)
+  const project = (txs) => txs.filter((tx) => !tx.tokenSymbol || tx.tokenSymbol === 'USDC')
+    .map((tx) => projectWalletTx(tx, address)).filter(Boolean)
+  // RPC is authoritative for records the validator still retains.
+  const transactions = mergeTransactions(project(userTxs), project(indexTxs), await fetchRpcHistory(rpcUrl, address))
+  await recheckPendingTxs(rpcUrl, transactions)
+  const estFee = estimateFeeFromCloudTxs(transactions)
+  return transactions.map((tx) => ({ ...tx, fee: tx.fee > 0 ? tx.fee : estFee }))
 }
 
 /**
@@ -335,54 +247,8 @@ export async function handleSync(req, res) {
   const rpcUrl = sanitizeRpcUrl(rawRpc) || DEFAULT_RPC
 
   try {
-    // Merge user txHistory AND global txIndex for robust transaction recovery.
-    // Using only one source loses transactions when the other is incomplete.
-    let transactions
-    let fromCloud = false
-    const indexTxs = getCloudTxsForAddress(address)
-    if (telegramId) {
-      const cloudTxs = getUserCloudTxHistory(telegramId, address)
-      // Merge both sources, deduplicating by signature
-      const seen = new Set()
-      const merged = [...cloudTxs, ...indexTxs].filter((tx) => {
-        if (seen.has(tx.signature)) return false
-        seen.add(tx.signature)
-        return true
-      })
-      if (merged.length > 0) {
-        // Sort by blockTime descending (newest first)
-        merged.sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0))
-        transactions = merged
-        fromCloud = true
-      } else {
-        transactions = await fetchRecentTxs(rpcUrl, address, 50)
-      }
-    } else {
-      // No telegramId — try txIndex by address first, then RPC
-      if (indexTxs.length > 0) {
-        transactions = indexTxs
-        fromCloud = true
-      } else {
-        transactions = await fetchRecentTxs(rpcUrl, address, 50)
-      }
-    }
-
-    // Requirement 1: re-check pending transactions before returning
-    if (transactions && transactions.length) {
-      transactions = await recheckPendingTxs(rpcUrl, transactions)
-    }
-
-    // Áp dụng phí ước tính cho tx có fee=0 (validator pruned)
-    if (transactions && transactions.length) {
-      const estFee = estimateFeeFromCloudTxs(transactions)
-      for (const tx of transactions) {
-        if (tx.fee == null || tx.fee === 0) {
-          tx.fee = estFee
-        }
-      }
-    }
-
-    const [usdc, sol, price] = await Promise.all([
+    const [transactions, usdc, sol, price] = await Promise.all([
+      getWalletTransactions(rpcUrl, address, telegramId),
       fetchUsdcBalance(rpcUrl, address),
       fetchSolBalance(rpcUrl, address),
       getPrice(priceEndpoint),

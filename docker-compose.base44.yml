@@ -8,7 +8,7 @@ services:
     working_dir: /app
     restart: on-failure
     command:
-      ['sh', '-ec', 'npm install --no-audit --no-fund --prefer-offline && exec node --watch index.mjs']
+      ['sh', '-ec', 'npm ci --no-audit --no-fund --prefer-offline && exec node --watch index.mjs']
     environment:
       - PORT=8000
       - DATA_DIR=/data
@@ -42,7 +42,7 @@ services:
     image: node:22
     working_dir: /app
     restart: on-failure
-    command: ['sh', '-ec', 'npm install --no-audit --no-fund --prefer-offline && exec npm run dev']
+    command: ['sh', '-ec', 'npm ci --no-audit --no-fund --prefer-offline && exec npm run dev']
     environment:
       - NODE_ENV=development
       - API_PROXY_TARGET=http://api:8000

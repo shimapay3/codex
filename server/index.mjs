@@ -3,7 +3,7 @@ import express from 'express'
 import { DEFAULT_RPC, handleRpcProxy } from './rpc.mjs'
 import { startAirdropCron, handleAirdropRequest, handleAirdropStatus, handleAirdropInfo, handleAirdropEligibility } from './airdrop.mjs'
 import { handleSync } from './sync.mjs'
-import { handleExplorerAddress, handleExplorerTx, saveCloudTx } from './explorer.mjs'
+import { handleExplorerAddress, handleExplorerTx, saveCloudTx, repairTransactionIndex } from './explorer.mjs'
 import { getState, load, save } from './store.mjs'
 
 const PORT = Number(process.env.PORT || 8000)
@@ -234,6 +234,7 @@ app.post('/api/user/data', (req, res) => {
   const users = getUserState()
   const existing = users[telegramId] || {}
   users[telegramId] = {
+    ...existing, // Never discard txHistory when contacts/preferences/samples are synced.
     contacts: Array.isArray(contacts) ? contacts : existing.contacts || [],
     prefs: prefs && typeof prefs === 'object' ? prefs : existing.prefs || null,
     samples: Array.isArray(samples) ? samples : existing.samples || [],
@@ -356,6 +357,7 @@ app.get('/api/explorer/address/:address', handleExplorerAddress)
 app.get('/api/explorer/tx/:signature', handleExplorerTx)
 
 load()
+repairTransactionIndex()
 
 const server = http.createServer(app)
 startAirdropCron()

@@ -41,6 +41,7 @@ import {
   vibrate,
 } from '../lib/notify'
 import { applyTheme } from '../lib/theme'
+import { mergeTxHistory, historyKey } from '../lib/txHistory'
 import { sendWebhook, buildTxMessage, markWebhookSent, isWebhookSent } from '../lib/webhook'
 import { readLocal, writeLocal, removeLocal, clearDeviceData, StorageKeys, getOrCreateDeviceId } from '../lib/storage'
 import { finishFileExport } from '../lib/fileExport'
@@ -287,9 +288,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (currentVault && currentKey) {
       const updatedVault = { ...currentVault, prefs }
       vaultRef.current = updatedVault
+      setVault(updatedVault)
       void encryptVaultData(currentKey, updatedVault).then((envelope) => {
+        if (vaultRef.current !== updatedVault || vaultKeyRef.current !== currentKey) return
         const existing = loadStore()
-        if (existing) saveStore({ ...existing, envelope })
+        if (existing) saveStore(syncIndex({ ...existing, envelope }, updatedVault))
       })
     }
   }, [prefs])
@@ -316,6 +319,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setPrefsState((current) => ({ ...current, ...next.prefs }))
       if (!key) return
       const envelope = await encryptVaultData(key, next)
+      if (vaultRef.current !== next || vaultKeyRef.current !== key) return
       const current = loadStore()
       if (!current) return
       const updated = syncIndex({ ...current, envelope }, next)
@@ -696,7 +700,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const current = vaultRef.current
       if (!current || current.activeWalletId === id) return
       setBalance((state) => ({ ...state, loading: true }))
-      setHistory([])
+      const target = current.wallets.find((w) => w.id === id)
+      setHistory(target ? current.historyByWallet?.[historyKey(current.prefs.rpcUrl, target.address)] || [] : [])
+      setLastPayment(null)
       await persist({ ...current, activeWalletId: id })
       seenRef.current = new Set()
 
@@ -801,6 +807,43 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     [vault],
   )
 
+  // History stays in the encrypted local vault even without Telegram or after RPC pruning.
+  const saveWalletHistory = useCallback((address: string, rpcUrl: string, entries: TxEntry[]) => {
+    const current = vaultRef.current
+    const key = vaultKeyRef.current
+    if (!current || !key || current.prefs.rpcUrl !== rpcUrl) return
+    const cache = { ...current.historyByWallet }
+    const ownKey = historyKey(rpcUrl, address)
+    cache[ownKey] = mergeTxHistory(cache[ownKey] || [], entries)
+    for (const wallet of current.wallets) {
+      if (wallet.address === address) continue
+      const related = entries.filter((tx) => tx.counterparty === wallet.address).map((tx): TxEntry => ({
+        ...tx, counterparty: address,
+        direction: tx.direction === 'out' ? 'in' : tx.direction === 'in' ? 'out' : tx.direction,
+      }))
+      if (related.length) {
+        const walletKey = historyKey(rpcUrl, wallet.address)
+        cache[walletKey] = mergeTxHistory(cache[walletKey] || [], related)
+      }
+    }
+    const next = { ...current, historyByWallet: cache }
+    vaultRef.current = next
+    setVault(next)
+    const active = current.wallets.find((w) => w.id === current.activeWalletId) || current.wallets[0]
+    if (active?.address === address) setHistory(cache[ownKey])
+    void encryptVaultData(key, next).then((envelope) => {
+      if (vaultRef.current !== next || vaultKeyRef.current !== key) return
+      const existing = loadStore()
+      if (existing) saveStore(syncIndex({ ...existing, envelope }, next))
+    })
+  }, [])
+
+  const isCurrentWallet = useCallback((address: string, rpcUrl: string) => {
+    const current = vaultRef.current
+    const active = current?.wallets.find((w) => w.id === current.activeWalletId) || current?.wallets[0]
+    return !!vaultKeyRef.current && active?.address === address && current?.prefs.rpcUrl === rpcUrl
+  }, [])
+
   const refreshBalance = useCallback(async () => {
     const current = vaultRef.current
     const wallet = current?.wallets.find((w) => w.id === current.activeWalletId) || current?.wallets[0]
@@ -812,6 +855,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         getUsdcBalance(rpcUrl, wallet.address),
         getSolBalance(rpcUrl, wallet.address),
       ])
+      if (!isCurrentWallet(wallet.address, rpcUrl)) return
       setBalance({ usdc: usdc.amount, sol, decimals: usdc.decimals, loading: false })
 
       const previous = vaultRef.current
@@ -827,20 +871,21 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           vaultRef.current = next
           if (key) {
             const envelope = await encryptVaultData(key, next)
+            if (vaultRef.current !== next || vaultKeyRef.current !== key) return
             const existing = loadStore()
-            if (existing) saveStore({ ...existing, envelope })
+            if (existing) saveStore(syncIndex({ ...existing, envelope }, next))
           }
         }
       }
     } catch {
-      setBalance((state) => ({ ...state, loading: false }))
+      if (isCurrentWallet(wallet.address, rpcUrl)) setBalance((state) => ({ ...state, loading: false }))
     }
-  }, [])
+  }, [isCurrentWallet])
 
   const announcePayment = useCallback(
     (entries: TxEntry[], address: string) => {
       const entry = entries[0]
-      const amount = entry.amount.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
+      const amount = entry.amount.toLocaleString('vi-VN', { maximumFractionDigits: 20 })
       const body = entry.memo || `Từ ${entry.counterparty?.slice(0, 6) || 'địa chỉ khác'}…`
       setLastPayment({
         address,
@@ -852,11 +897,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (prefs.sound) ringIncoming()
       vibrate([90, 60, 90])
       if (prefs.notifications) {
-        showSystemNotification(`−${amount} USDC đã nhận`, body, entry.signature)
+        showSystemNotification(`+${amount} USDC đã nhận`, body, entry.signature)
       }
       pushToast({
         tone: 'payment',
-        title: `−${amount} USDC đã nhận`,
+        title: `+${amount} USDC đã nhận`,
         body,
         signature: entry.signature,
       })
@@ -873,17 +918,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (!options.silent) setHistoryLoading(true)
       try {
         const entries = await fetchTokenHistory(rpcUrl, wallet.address)
-        // Merge with existing history instead of replacing — prevents
-        // losing older transactions when RPC has pruned them
-        setHistory((prev) => {
-          const newSigs = new Set(entries.map((e) => e.signature))
-          const merged = [
-            ...entries,
-            ...prev.filter((e) => !newSigs.has(e.signature)),
-          ]
-          merged.sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0))
-          return merged
-        })
+        if (!isCurrentWallet(wallet.address, rpcUrl)) return
+        saveWalletHistory(wallet.address, rpcUrl, entries)
 
         const first = seenRef.current.size === 0
         const fresh = entries.filter(
@@ -894,10 +930,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       } catch {
         /* keep the previous list on failure */
       } finally {
-        setHistoryLoading(false)
+        if (isCurrentWallet(wallet.address, rpcUrl)) setHistoryLoading(false)
       }
     },
-    [announcePayment],
+    [announcePayment, isCurrentWallet, saveWalletHistory],
   )
 
   const refresh = useCallback(async () => {
@@ -915,6 +951,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const handleRealtimePoll = useCallback(
     (data: SyncResponse) => {
+      if (!isCurrentWallet(data.address, rpcUrl)) return
       // Update balances
       setBalance({
         usdc: data.usdcBalance,
@@ -951,18 +988,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Update history — merge server transactions with existing list
-      // (server returns at most 15; replace would lose older entries)
+      // The same merge rules apply to initial refresh, polling, and successful sends.
       if (data.transactions.length) {
-        setHistory((prev) => {
-          const serverSigs = new Set(data.transactions.map((t: TxEntry) => t.signature))
-          const merged = [
-            ...data.transactions,
-            ...prev.filter((t) => !serverSigs.has(t.signature)),
-          ]
-          merged.sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0))
-          return merged
-        })
+        saveWalletHistory(data.address, rpcUrl, data.transactions)
         const first = seenRef.current.size === 0
         const fresh = data.transactions.filter(
           (entry) => entry.direction === 'in' && entry.status === 'success' && !seenRef.current.has(entry.signature),
@@ -974,7 +1002,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Requirement 1: re-enable send when no pending transactions remain
-      const hasPending = data.transactions.some((tx) => tx.status === 'pending')
+      const hasPending = (vaultRef.current?.historyByWallet?.[historyKey(rpcUrl, data.address)] || data.transactions).some((tx) => tx.status === 'pending')
       setSendDisabled(hasPending)
 
       // Update balance samples
@@ -991,14 +1019,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           vaultRef.current = next
           if (key) {
             void encryptVaultData(key, next).then((envelope) => {
+              if (vaultRef.current !== next || vaultKeyRef.current !== key) return
               const existing = loadStore()
-              if (existing) saveStore({ ...existing, envelope })
+              if (existing) saveStore(syncIndex({ ...existing, envelope }, next))
             })
           }
         }
       }
     },
-    [announcePayment, activeWallet?.address, prefs.notifications, prefs.sound, pushToast],
+    [announcePayment, activeWallet?.address, prefs.notifications, prefs.sound, pushToast, isCurrentWallet, saveWalletHistory, rpcUrl],
   )
 
   useRealtimePoll({
@@ -1141,6 +1170,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   // --- initial load on unlock / wallet switch ---
   useEffect(() => {
     if (session !== 'unlocked') return
+    setHistory(vaultRef.current?.historyByWallet?.[historyKey(rpcUrl, activeWallet?.address || '')] || [])
+    seenRef.current = new Set()
+    setSendDisabled(false)
     void refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, activeWallet?.id, rpcUrl])
@@ -1252,6 +1284,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           decimals,
         })
 
+        // Only confirmed sends enter local history; pending status is resolved by sync.
+        if (result.status === 'success') saveWalletHistory(wallet.address, rpcUrlNow, [{
+          signature: result.signature, slot: result.slot, blockTime: result.blockTime,
+          direction: params.to.trim() === wallet.address ? 'self' : 'out',
+          amount: params.amount, decimals, fee: result.fee, status: result.status,
+          memo: params.memo || '', counterparty: params.to.trim(), explorerUrl: explorerTxUrl(result.signature),
+        }])
+
         // Requirement 1: if confirmation timed out (>30s), record as pending
         if (result.status === 'pending') {
           const tgId = getTelegramUserIdString()
@@ -1286,13 +1326,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
         const { signature, slot, blockTime, fee } = result
 
-        const meta = { ...current.txMeta }
+        const latest = vaultRef.current || current
+        const meta = { ...latest.txMeta }
         meta[signature] = {
           category: params.category || 'pay',
           wish: params.wish || '',
           note: params.memo,
         }
-        await persist({ ...current, txMeta: meta })
+        await persist({ ...latest, txMeta: meta })
 
         if (prefs.sound) ringSuccess()
         vibrate([60, 40, 120])
@@ -1426,7 +1467,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         throw new Error(message)
       }
     },
-    [balance.decimals, balance.usdc, persist, prefs.notifications, prefs.sound, prefs.webhookAutoSend, prefs.webhookBotToken, prefs.webhookTopicUrl, pushToast, refresh],
+    [balance.decimals, balance.usdc, persist, prefs.notifications, prefs.sound, prefs.webhookAutoSend, prefs.webhookBotToken, prefs.webhookTopicUrl, pushToast, refresh, saveWalletHistory],
   )
 
   // --- send SOL -------------------------------------------------------------

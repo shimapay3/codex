@@ -11,6 +11,7 @@ import {
   wrapKey,
 } from '../lib/crypto'
 import { readLocal, writeLocal, StorageKeys } from '../lib/storage'
+import type { TxEntry } from '../lib/solana'
 
 export type WalletRecord = {
   id: string
@@ -64,6 +65,8 @@ export type VaultData = {
   txMeta: TxMeta
   samples: BalanceSample[]
   prefs: Prefs
+  /** Encrypted, local-only history, isolated by RPC network and wallet address. */
+  historyByWallet?: Record<string, TxEntry[]>
 }
 
 export type WalletIndexEntry = {

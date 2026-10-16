@@ -79,6 +79,15 @@ Verify with `docker compose -f docker-compose.base44.yml ps` and `curl -s localh
   hardcoded; `API_PROXY_TARGET` is what makes the SPA single-origin behind the dev server proxy.
 - No application behaviour is disabled in preview mode, and no authentication check is bypassed.
 
+## Transaction-history invariants (October 2026)
+
+- `server/tx-history.mjs` owns wallet-relative projection and RPC parsing. A cloud record's direction is relative to `walletAddress`; viewing it from `counterparty` inverts in/out and swaps the displayed partner. Always return copies: reads must never flip the canonical stored sender record.
+- `/api/sync` merges user history, the public transaction index, AND RPC even when cloud history is nonempty. RPC discovery unions the owner, Token-2022 ATA and other USDC accounts, follows `before` pages, and computes deltas from raw BigInt base units. `PublicKey` comes from `@solana/web3.js`, not `@solana/spl-token`.
+- Updating `/api/user/data` must preserve `txHistory`. Startup `repairTransactionIndex` rebuilds both address indexes without changing amounts and recovers user histories only for explicitly registered `tg-<id>` device wallet addresses. Take a VPS store backup before deploying repair changes; data pruned from the validator and absent from every backup cannot be reconstructed.
+- Frontend history is cached inside the encrypted local vault under `historyByWallet`, keyed by RPC URL + wallet address. Confirmed USDC send results are recorded locally with or without Telegram; unconfirmed sends keep the existing pending/sync flow. Polling/manual refresh merge by signature; stale pending results must not undo a confirmed result. Reject late responses after a wallet/network switch. Incoming USDC uses `+`, outgoing uses `−`.
+- Run backend regressions with `docker compose -f docker-compose.base44.yml exec -T api npm test`. The integration suite creates its own temporary store and mock validator and deletes both; it must never use the application data volume. Browser history QA covered real import/verified-backup/PIN/send/switch/reload gestures in a fresh isolated browser with mocked network responses (no real funds or Telegram messages). A real Telegram WebView remains a physical-session check.
+- Compose installs now use `npm ci` at startup. Wait for the web healthcheck after recreating containers before running build/tests against the dependency volume.
+
 ## Verifying
 
 ```bash

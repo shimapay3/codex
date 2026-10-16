@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node index.mjs",
-    "dev": "node --watch index.mjs"
+    "dev": "node --watch index.mjs",
+    "test": "node --test *.test.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",
