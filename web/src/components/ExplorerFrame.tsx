@@ -22,6 +22,7 @@ import {
   formatAmount,
   formatSolBalance,
   USDC_MINT,
+  XSA_MINT,
 } from '../lib/solana'
 import { isValidAddress, shortAddress } from '../lib/crypto'
 import { getTelegramUserIdString } from '../lib/telegram'
@@ -34,6 +35,8 @@ type AddressResult = {
   sol: number
   usdc: number
   usdcDecimals: number
+  xsa: number
+  xsaDecimals: number
 }
 
 type TxResult = {
@@ -79,9 +82,10 @@ function extractMemo(tx: any): string {
 }
 
 async function lookupAddress(rpcUrl: string, address: string): Promise<AddressResult> {
-  const [sol, usdc] = await Promise.all([
+  const [sol, usdc, xsa] = await Promise.all([
     getSolBalance(rpcUrl, address),
     getUsdcBalance(rpcUrl, address),
+    getUsdcBalance(rpcUrl, address, XSA_MINT),
   ])
   return {
     type: 'address',
@@ -89,6 +93,8 @@ async function lookupAddress(rpcUrl: string, address: string): Promise<AddressRe
     sol,
     usdc: usdc.amount,
     usdcDecimals: usdc.decimals,
+    xsa: xsa.amount,
+    xsaDecimals: xsa.decimals,
   }
 }
 
@@ -426,6 +432,14 @@ function AddressView({ result }: { result: AddressResult }) {
             {formatAmount(result.usdc, 2)} <span className="text-[12px] text-[color:var(--muted)]">USDC</span>
           </p>
         </div>
+        <div className="rounded-2xl bg-[color:var(--surface)] p-3">
+          <p className="text-[10.5px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+            Số dư XSA
+          </p>
+          <p className="mt-1 text-[18px] font-bold tabular-nums" style={{ color: '#a29bfe' }}>
+            {formatAmount(result.xsa, 2)} <span className="text-[12px] text-[color:var(--muted)]">XSA</span>
+          </p>
+        </div>
       </div>
     </div>
   )
@@ -489,22 +503,24 @@ function TxView({ result }: { result: TxResult }) {
           <div className="space-y-2">
             {result.tokenTransfers.map((transfer, i) => {
               const isUsdc = transfer.mint === USDC_MINT
+              const isXsa = transfer.mint === XSA_MINT
+              const symbol = isUsdc ? 'USDC' : isXsa ? 'XSA' : shortAddress(transfer.mint, 4)
               return (
                 <div key={i} className="rounded-2xl bg-[color:var(--surface)] p-3">
                   <div className="flex items-center gap-2">
                     <div
                       className="flex h-7 w-7 items-center justify-center rounded-full"
                       style={{
-                        background: isUsdc ? 'rgba(34,224,122,.16)' : 'rgba(99,102,241,.16)',
+                        background: isUsdc ? 'rgba(34,224,122,.16)' : isXsa ? 'rgba(108,92,231,.16)' : 'rgba(99,102,241,.16)',
                       }}
                     >
-                      <ArrowUpRight size={14} className={isUsdc ? 'text-[#22e07a]' : 'text-[#6366f1]'} />
+                      <ArrowUpRight size={14} className={isUsdc ? 'text-[#22e07a]' : isXsa ? 'text-[#a29bfe]' : 'text-[#6366f1]'} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] font-semibold tabular-nums">
                         {formatAmount(transfer.amount, transfer.decimals)}{' '}
                         <span className="text-[11px] text-[color:var(--muted)]">
-                          {isUsdc ? 'USDC' : shortAddress(transfer.mint, 4)}
+                          {symbol}
                         </span>
                       </p>
                       <p className="font-mono text-[10px] text-[color:var(--muted)]">

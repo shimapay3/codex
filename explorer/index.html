@@ -96,6 +96,8 @@
     .back-btn { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: var(--muted); cursor: pointer; margin-bottom: 1rem; }
     .back-btn:hover { color: var(--text); }
     .cloud-badge { font-size: 0.6rem; background: rgba(99,102,241,0.16); color: #818cf8; padding: 0.1rem 0.4rem; border-radius: 0.3rem; margin-left: 0.4rem; }
+    .verified-badge { display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.6rem; background: rgba(29,155,240,0.16); color: #1d9bf0; padding: 0.1rem 0.35rem; border-radius: 0.3rem; margin-left: 0.3rem; }
+    .xsa-icon { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(108,92,231,0.2); color: #a29bfe; font-size: 0.7rem; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -106,6 +108,20 @@
     const SOL_ICON = 'https://explorer.solana.com/icon-144.png'
     const USDC_ICON = 'https://usdc.dolaxanh.com/a/ACg8ocJtRSV_No5FrhpG55lc3nUSspbIExRO0CVJIMLt4SXgiobyEoI5=s72-c-no'
     const USDC_MINT = 'USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2'
+    const XSA_MINT = 'XSAdG6BXMCFxD5Q8qHtJqEHisSk3qdEVDZt8YvTjX47'
+    const XSA_ICON = 'https://usdc.dolaxanh.com/a/ACg8ocJtRSV_No5FrhpG55lc3nUSspbIExRO0CVJIMLt4SXgiobyEoI5=s72-c-no'
+    const VERIFIED_SVG = '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 1.8 3 .2.2 3L19.4 9l-1.8 2.4.2 3-3 .2L12 18l-2.4-1.4-3-.2-.2-3L4.6 9l1.8-2.4-.2-3 3-.2z" opacity="0.3"/><path d="M9.5 12.5l2 2 4-4" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+
+    function tokenIcon(symbol) {
+      if (symbol === 'XSA') return XSA_ICON
+      if (symbol === 'USDC') return USDC_ICON
+      return SOL_ICON
+    }
+
+    function tokenBadge(symbol) {
+      if (symbol === 'USDC' || symbol === 'XSA') return '<span class="verified-badge">' + VERIFIED_SVG + ' Đã xác minh</span>'
+      return ''
+    }
 
     function shortAddr(addr, n = 4) {
       if (!addr) return '—'
@@ -178,28 +194,37 @@
         const rpcQ = rpc ? '?rpc=' + encodeURIComponent(rpc) : ''
         const data = await apiGet('/api/explorer/address/' + address + rpcQ)
 
-        let tokensHtml = (data.tokens || []).map(t => `
+        let tokensHtml = (data.tokens || []).map(t => {
+          const isXsa = t.symbol === 'XSA'
+          const iconHtml = isXsa
+            ? `<div class="xsa-icon">X</div>`
+            : `<img src="${t.icon || SOL_ICON}" class="token-icon" alt="${t.symbol}" onerror="this.src='${SOL_ICON}'">`
+          return `
           <div class="token-row">
-            <img src="${t.icon || SOL_ICON}" class="token-icon" alt="${t.symbol}" onerror="this.src='${SOL_ICON}'">
+            ${iconHtml}
             <div style="flex:1">
-              <div style="font-weight:600;font-size:0.8rem">${t.symbol}</div>
+              <div style="font-weight:600;font-size:0.8rem">${t.symbol} ${tokenBadge(t.symbol)}</div>
               <div class="mono" style="font-size:0.65rem;color:var(--muted)">${fmtAmt(t.balance, t.decimals)} ${t.symbol}</div>
             </div>
           </div>
-        `).join('')
+        `}).join('')
 
         let txsHtml = ''
         if (data.transactions && data.transactions.length > 0) {
           txsHtml = data.transactions.map(tx => {
             const isIn = tx.direction === 'in'
-            const icon = tx.tokenSymbol === 'SOL' ? SOL_ICON : USDC_ICON
+            const sym = tx.tokenSymbol || 'USDC'
+            const isXsa = sym === 'XSA'
+            const iconHtml = isXsa
+              ? `<div style="width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(108,92,231,0.2);color:#a29bfe;font-size:0.5rem;font-weight:700">X</div>`
+              : `<img src="${tokenIcon(sym)}" style="width:16px;height:16px;border-radius:50%" onerror="this.src='${SOL_ICON}'">`
             return `
               <div class="tx-item" onclick="navigate('/tx/${tx.signature}')">
                 <div class="tx-dir ${isIn ? 'in' : 'out'}">${isIn ? '↑' : '↓'}</div>
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;align-items:center;gap:0.4rem">
-                    <img src="${icon}" style="width:16px;height:16px;border-radius:50%" onerror="this.src='${SOL_ICON}'">
-                    <span class="tx-amount">${isIn ? '+' : '−'}${fmtAmt(tx.amount, tx.decimals)} ${tx.tokenSymbol || 'USDC'}</span>
+                    ${iconHtml}
+                    <span class="tx-amount">${isIn ? '+' : '−'}${fmtAmt(tx.amount, tx.decimals)} ${sym}</span>
                   </div>
                   <div class="tx-time">${fmtTime(tx.blockTime)} · ${shortAddr(tx.counterparty || tx.walletAddress)}</div>
                   ${tx.memo ? `<div class="tx-memo">${tx.memo}</div>` : ''}
@@ -249,13 +274,17 @@
         let transfersHtml = ''
         if (tx.tokenTransfers && tx.tokenTransfers.length > 0) {
           transfersHtml = tx.tokenTransfers.map(t => {
-            const icon = t.mint === USDC_MINT ? USDC_ICON : SOL_ICON
-            const symbol = t.symbol || shortAddr(t.mint, 4)
+            const isXsa = t.mint === XSA_MINT
+            const isUsdc = t.mint === USDC_MINT
+            const symbol = t.symbol || (isXsa ? 'XSA' : isUsdc ? 'USDC' : shortAddr(t.mint, 4))
+            const iconHtml = isXsa
+              ? `<div class="xsa-icon">X</div>`
+              : `<img src="${t.icon || (isUsdc ? USDC_ICON : SOL_ICON)}" class="token-icon" alt="${symbol}" onerror="this.src='${SOL_ICON}'">`
             return `
               <div class="token-row">
-                <img src="${t.icon || icon}" class="token-icon" alt="${symbol}" onerror="this.src='${SOL_ICON}'">
+                ${iconHtml}
                 <div style="flex:1;min-width:0">
-                  <div style="font-weight:700;font-size:0.8rem">${fmtAmt(t.amount, t.decimals)} ${symbol}</div>
+                  <div style="font-weight:700;font-size:0.8rem">${fmtAmt(t.amount, t.decimals)} ${symbol} ${tokenBadge(symbol)}</div>
                   <div class="mono" style="font-size:0.65rem;color:var(--muted)">
                     <span class="link" onclick="navigate('/address/${t.from}')">${shortAddr(t.from)}</span>
                     → <span class="link" onclick="navigate('/address/${t.to}')">${shortAddr(t.to)}</span>
@@ -309,7 +338,7 @@
             </div>
             <div class="card-title">Chữ ký</div>
             <div class="mono" style="margin-bottom:0.75rem">${tx.signature}</div>
-            <div class="info-row"><span class="info-label">Số dư USDC</span><span class="info-value" style="color:${tx.direction === 'in' ? '#22e07a' : tx.direction === 'out' ? 'var(--accent)' : 'var(--text)'}">${tx.direction === 'in' ? '+' : tx.direction === 'out' ? '−' : ''}${fmtAmt(tx.amount || (tx.tokenTransfers || []).filter(t => t.mint === USDC_MINT).reduce((s, t) => s + t.amount, 0), tx.decimals || 6)} USDC</span></div>
+            <div class="info-row"><span class="info-label">Số dư ${tx.tokenSymbol || 'USDC'}</span><span class="info-value" style="color:${tx.direction === 'in' ? '#22e07a' : tx.direction === 'out' ? 'var(--accent)' : 'var(--text)'}">${tx.direction === 'in' ? '+' : tx.direction === 'out' ? '−' : ''}${fmtAmt(tx.amount || (tx.tokenTransfers || []).filter(t => t.mint === USDC_MINT || t.mint === XSA_MINT).reduce((s, t) => s + t.amount, 0), tx.decimals || 6)} ${tx.tokenSymbol || 'USDC'}</span></div>
             <div class="info-row"><span class="info-label">Số dư SOL</span><span class="info-value" style="color:${tx.direction === 'in' ? '#22e07a' : 'var(--accent)'}">${tx.direction === 'in' ? '+' : '−'}${fmtAmt((tx.fee || 0) + (tx.solTransfers || []).reduce((s, t) => s + t.amount, 0), 9)} SOL</span></div>
             ${tx.memo ? `<div class="info-row"><span class="info-label">Memo</span><span class="info-value">${tx.memo}</span></div>` : ''}
           </div>

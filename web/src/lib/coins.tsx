@@ -1,3 +1,4 @@
+import { BadgeCheck } from 'lucide-react'
 import UsdcAvatar from '../components/UsdcAvatar'
 import { SOL_ICON, XSA_MINT } from './solana'
 
@@ -51,8 +52,27 @@ export const COINS: CoinConfig[] = [
     id: 'xsa',
     name: 'XSA Token',
     symbol: 'XSA',
-    icon: <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#6C5CE7]/20 text-[16px] font-bold text-[#a29bfe]">X</span>,
-    iconSm: <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#6C5CE7]/20 text-[10px] font-bold text-[#a29bfe]">X</span>,
+    icon: (
+      <span className="relative inline-flex shrink-0" style={{ width: 40, height: 40 }}>
+        <span className="flex h-full w-full items-center justify-center rounded-full bg-[#6C5CE7]/20 text-[16px] font-bold text-[#a29bfe]">X</span>
+        <BadgeCheck
+          size={17}
+          className="absolute -bottom-0.5 -right-0.5 rounded-full bg-[color:var(--bg)] text-[#1d9bf0]"
+          strokeWidth={2.6}
+          aria-label="Token đã xác minh"
+        />
+      </span>
+    ),
+    iconSm: (
+      <span className="relative inline-flex shrink-0" style={{ width: 18, height: 18 }}>
+        <span className="flex h-full w-full items-center justify-center rounded-full bg-[#6C5CE7]/20 text-[10px] font-bold text-[#a29bfe]">X</span>
+        <BadgeCheck
+          size={9}
+          className="absolute -bottom-0.5 -right-0.5 rounded-full bg-[color:var(--bg)] text-[#1d9bf0]"
+          strokeWidth={2.6}
+        />
+      </span>
+    ),
     hasUsdValue: true,
     tagline: 'Token Cloud Chain · giá động',
     quickAmounts: [1, 5, 10, 50, 100],

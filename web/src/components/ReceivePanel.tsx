@@ -4,18 +4,23 @@ import { Check, Copy, Download, QrCode, Share2, ShieldCheck } from 'lucide-react
 import { useWallet } from '../state/WalletProvider'
 import { copyToClipboard, downloadTextFile } from '../lib/format'
 import UsdcAvatar from './UsdcAvatar'
-import { USDC_MINT } from '../lib/solana'
+import { USDC_MINT, XSA_MINT } from '../lib/solana'
+import type { CoinConfig } from '../lib/coins'
+
+type Props = { coin: CoinConfig }
 
 /**
  * Receive screen: QR + address so a sender can scan in one step. The QR holds
  * the wallet address, the same value shown underneath for manual entry.
  */
-export default function ReceivePanel() {
+export default function ReceivePanel({ coin }: Props) {
   const { activeWallet, pushToast, prefs } = useWallet()
   const [qr, setQr] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
   const address = activeWallet?.address || ''
+  const isXsa = coin.id === 'xsa'
+  const mintAddress = isXsa ? XSA_MINT : USDC_MINT
 
   useEffect(() => {
     if (!address) return
@@ -36,8 +41,8 @@ export default function ReceivePanel() {
   }, [address])
 
   const shareText = useMemo(
-    () => `Ví XPay của tôi (Cloud Chain)\n${address}\nChỉ gửi USDC trên mạng Cloud Chain.`,
-    [address],
+    () => `Ví XPay của tôi (Cloud Chain)\n${address}\nChỉ gửi ${coin.symbol} trên mạng Cloud Chain.`,
+    [address, coin.symbol],
   )
 
   const handleCopy = async () => {
@@ -71,9 +76,9 @@ export default function ReceivePanel() {
           style={{ background: 'radial-gradient(circle, var(--accent), transparent 70%)' }}
         />
         <div className="relative flex items-center gap-3">
-          <UsdcAvatar size={40} />
+          {isXsa ? coin.icon : <UsdcAvatar size={40} />}
           <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-semibold">Nhận USDC</p>
+            <p className="text-[14px] font-semibold">Nhận {coin.symbol}</p>
             <p className="truncate text-[11.5px] text-[color:var(--muted)]">
               {activeWallet.name} · Cloud Chain
             </p>
@@ -125,7 +130,7 @@ export default function ReceivePanel() {
             onClick={() => {
               downloadTextFile(
                 'cloudpay-qr.txt',
-                `Cloud Chain address: ${address}\nToken: USDC (${USDC_MINT})\n`,
+                `Cloud Chain address: ${address}\nToken: ${coin.symbol} (${mintAddress})\n`,
                 'text/plain',
               )
             }}
@@ -140,7 +145,7 @@ export default function ReceivePanel() {
       <div className="flex items-start gap-2.5 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-3.5">
         <ShieldCheck size={17} className="mt-0.5 shrink-0 text-[#22e07a]" />
         <p className="text-[11.5px] leading-relaxed text-[color:var(--muted)]">
-          Chỉ gửi <span className="font-semibold text-[color:var(--text)]">USDC</span> trên mạng Cloud Chain
+          Chỉ gửi <span className="font-semibold text-[color:var(--text)]">{coin.symbol}</span> trên mạng Cloud Chain
           tới địa chỉ này. Khi tiền vào ví, ứng dụng sẽ kêu chuông, rung và hiện thông báo hệ thống ngay
           lập tức{prefs.notifications ? '' : ' (hãy bật thông báo trong Cài đặt)'}.
         </p>
