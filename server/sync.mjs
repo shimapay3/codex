@@ -335,28 +335,30 @@ export async function handleSync(req, res) {
   const rpcUrl = sanitizeRpcUrl(rawRpc) || DEFAULT_RPC
 
   try {
-    // When telegramId is provided, use cloud transaction history instead of
-    // RPC (avoids validator slot overflow / empty history).
+    // Merge user txHistory AND global txIndex for robust transaction recovery.
+    // Using only one source loses transactions when the other is incomplete.
     let transactions
     let fromCloud = false
+    const indexTxs = getCloudTxsForAddress(address)
     if (telegramId) {
       const cloudTxs = getUserCloudTxHistory(telegramId, address)
-      if (cloudTxs.length > 0) {
-        transactions = cloudTxs
+      // Merge both sources, deduplicating by signature
+      const seen = new Set()
+      const merged = [...cloudTxs, ...indexTxs].filter((tx) => {
+        if (seen.has(tx.signature)) return false
+        seen.add(tx.signature)
+        return true
+      })
+      if (merged.length > 0) {
+        // Sort by blockTime descending (newest first)
+        merged.sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0))
+        transactions = merged
         fromCloud = true
       } else {
-        // Fallback: check txIndex by address (populated even if user txHistory is empty)
-        const indexTxs = getCloudTxsForAddress(address)
-        if (indexTxs.length > 0) {
-          transactions = indexTxs
-          fromCloud = true
-        } else {
-          transactions = await fetchRecentTxs(rpcUrl, address, 50)
-        }
+        transactions = await fetchRecentTxs(rpcUrl, address, 50)
       }
     } else {
       // No telegramId — try txIndex by address first, then RPC
-      const indexTxs = getCloudTxsForAddress(address)
       if (indexTxs.length > 0) {
         transactions = indexTxs
         fromCloud = true

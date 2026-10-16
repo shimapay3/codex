@@ -873,7 +873,17 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (!options.silent) setHistoryLoading(true)
       try {
         const entries = await fetchTokenHistory(rpcUrl, wallet.address)
-        setHistory(entries)
+        // Merge with existing history instead of replacing — prevents
+        // losing older transactions when RPC has pruned them
+        setHistory((prev) => {
+          const newSigs = new Set(entries.map((e) => e.signature))
+          const merged = [
+            ...entries,
+            ...prev.filter((e) => !newSigs.has(e.signature)),
+          ]
+          merged.sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0))
+          return merged
+        })
 
         const first = seenRef.current.size === 0
         const fresh = entries.filter(
