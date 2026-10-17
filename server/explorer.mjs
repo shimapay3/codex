@@ -85,13 +85,14 @@ async function fetchSolBalance(rpcUrl, owner) {
 }
 
 async function fetchTokenBalance(rpcUrl, owner, mint) {
+  const defaultDecimals = mint === XSA_MINT ? 8 : 9
   try {
     const [byMint, byProgram] = await Promise.allSettled([
       rpcMethod(rpcUrl, 'getTokenAccountsByOwner', [owner, { mint }, { encoding: 'jsonParsed' }]),
       rpcMethod(rpcUrl, 'getTokenAccountsByOwner', [owner, { programId: TOKEN_2022 }, { encoding: 'jsonParsed' }]),
     ])
     const seen = new Map()
-    let decimals = 6
+    let decimals = defaultDecimals
     for (const outcome of [byMint, byProgram]) {
       if (outcome.status !== 'fulfilled') continue
       for (const entry of outcome.value?.value || []) {
@@ -121,7 +122,7 @@ async function fetchTokenBalance(rpcUrl, owner, mint) {
     }
     return { amount: Number(total) / 10 ** decimals, decimals }
   } catch {
-    return { amount: 0, decimals: 6 }
+    return { amount: 0, decimals: defaultDecimals }
   }
 }
 

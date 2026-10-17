@@ -76,7 +76,7 @@ export const COINS: CoinConfig[] = [
     hasUsdValue: true,
     tagline: 'Token Cloud Chain · giá động',
     quickAmounts: [1, 5, 10, 50, 100],
-    decimals: 6,
+    decimals: 8,
     hasMemo: true,
     enabled: true,
   },

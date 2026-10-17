@@ -18,7 +18,6 @@ export type SyncResponse = {
     error: string | null
   }
   price: PriceInfo
-  xsaPrice: PriceInfo
   at: number
 }
 

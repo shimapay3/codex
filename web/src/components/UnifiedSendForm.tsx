@@ -70,14 +70,14 @@ export default function UnifiedSendForm({ coin }: Props) {
   // Balance and amount parsing per coin
   const coinBalance = isUsdc ? balance.usdc : isXsa ? balance.xsa : isSol ? balance.sol : 0
   const maxAmount = isUsdc
-    ? Math.floor(balance.usdc * 1e6) / 1e6
+    ? Math.floor(balance.usdc * 10 ** coin.decimals) / 10 ** coin.decimals
     : isXsa
-      ? Math.floor(balance.xsa * 1e6) / 1e6
+      ? Math.floor(balance.xsa * 10 ** coin.decimals) / 10 ** coin.decimals
       : isSol
         ? Math.max(0, balance.sol - 0.001)
         : 0
   const amount = isToken
-    ? parseAmountInput(amountText, balance.decimals || 6)
+    ? parseAmountInput(amountText, coin.decimals)
     : Number.parseFloat(amountText.replace(/,/g, '.')) || 0
 
   const memo = useMemo(() => {

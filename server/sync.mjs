@@ -23,7 +23,6 @@ const TOKEN_2022 = 'TokenzQdBNbLqP5VEhPkASv1L5Xuo6YHuHD4qLm9Q'
 const FIXED_USD = 1
 const FIXED_VND = 30000
 const PRICE_ENDPOINT = (process.env.PRICE_ENDPOINT || '').trim()
-const XSA_PRICE_ENDPOINT = (process.env.XSA_PRICE_ENDPOINT || '').trim()
 const PRICE_CACHE_MS = 5000
 
 const priceCache = new Map()
@@ -87,36 +86,6 @@ async function getPrice(endpoint) {
   }
 }
 
-async function getXsaPrice(endpoint) {
-  // XSA price: uses XSA_PRICE_ENDPOINT env var or falls back to fixed 1 USD.
-  // The cache TTL is 5s (PRICE_CACHE_MS) for dynamic price updates.
-  const url = XSA_PRICE_ENDPOINT
-  if (!url) {
-    return { usd: FIXED_USD, vnd: FIXED_VND, source: 'fixed' }
-  }
-  const cached = priceCache.get('xsa:' + url)
-  if (cached && Date.now() - cached.at < PRICE_CACHE_MS) {
-    return cached.value
-  }
-  try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 5000)
-    const upstream = await fetch(url, {
-      headers: { accept: 'application/json' },
-      signal: controller.signal,
-    })
-    clearTimeout(timer)
-    const payload = await upstream.json()
-    const price = pickPrice(payload)
-    if (!price) throw new Error('Không đọc được giá XSA')
-    const result = { ...price, source: 'endpoint' }
-    priceCache.set('xsa:' + url, { value: result, at: Date.now() })
-    return result
-  } catch {
-    return { usd: FIXED_USD, vnd: FIXED_VND, source: 'fixed', fallback: true }
-  }
-}
-
 function getAirdropStatus(address) {
   const state = getState()
   const record = state.airdrops?.records?.[address]
@@ -131,6 +100,7 @@ function getAirdropStatus(address) {
 }
 
 async function fetchTokenBalance(rpcUrl, owner, mint) {
+  const defaultDecimals = mint === XSA_MINT ? 8 : 9
   try {
     const [byMint, byProgram] = await Promise.allSettled([
       rpcMethod(rpcUrl, 'getTokenAccountsByOwner', [owner, { mint }, { encoding: 'jsonParsed' }]),
@@ -138,7 +108,7 @@ async function fetchTokenBalance(rpcUrl, owner, mint) {
     ])
 
     const seen = new Map()
-    let decimals = 6
+    let decimals = defaultDecimals
     for (const outcome of [byMint, byProgram]) {
       if (outcome.status !== 'fulfilled') continue
       for (const entry of outcome.value?.value || []) {
@@ -172,7 +142,7 @@ async function fetchTokenBalance(rpcUrl, owner, mint) {
 
     return { amount: Number(total) / 10 ** decimals, decimals }
   } catch {
-    return { amount: 0, decimals: 6 }
+    return { amount: 0, decimals: defaultDecimals }
   }
 }
 
@@ -277,13 +247,12 @@ export async function handleSync(req, res) {
   const rpcUrl = sanitizeRpcUrl(rawRpc) || DEFAULT_RPC
 
   try {
-    const [transactions, usdc, xsa, sol, price, xsaPrice] = await Promise.all([
+    const [transactions, usdc, xsa, sol, price] = await Promise.all([
       getWalletTransactions(rpcUrl, address, telegramId),
       fetchTokenBalance(rpcUrl, address, USDC_MINT),
       fetchTokenBalance(rpcUrl, address, XSA_MINT),
       fetchSolBalance(rpcUrl, address),
       getPrice(priceEndpoint),
-      getXsaPrice(priceEndpoint),
     ])
 
     const airdrop = getAirdropStatus(address)
@@ -307,7 +276,6 @@ export async function handleSync(req, res) {
       newCount,
       airdrop,
       price,
-      xsaPrice,
       at: Date.now(),
     })
   } catch (err) {

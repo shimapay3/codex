@@ -44,6 +44,7 @@ export const EXPLORER_BASE = 'https://chain.localusd.cloud'
 export const SOL_ICON = 'https://explorer.solana.com/icon-144.png'
 export const EXPLORER_CUSTOM_URL = 'https://rpc.localusd.cloud'
 export const USDC_DECIMALS_FALLBACK = 6
+export const XSA_DECIMALS_FALLBACK = 8
 export const MAX_WALLETS = 5
 
 /** Every RPC call goes through our own API so CORS never blocks a custom node. */
@@ -108,6 +109,7 @@ const decimalsCache = new Map<string, number>()
  */
 export async function getUsdcDecimals(rpcUrl: string, mint = USDC_MINT): Promise<number> {
   const cacheKey = `${rpcUrl}|${mint}`
+  const fallback = mint === XSA_MINT ? XSA_DECIMALS_FALLBACK : USDC_DECIMALS_FALLBACK
   const cached = decimalsCache.get(cacheKey)
   if (cached) return cached
 
@@ -138,7 +140,7 @@ export async function getUsdcDecimals(rpcUrl: string, mint = USDC_MINT): Promise
     /* keep the default */
   }
 
-  return USDC_DECIMALS_FALLBACK
+  return fallback
 }
 
 function sumTokenAccounts(accounts: any[]): bigint {
@@ -475,6 +477,21 @@ export async function fetchTransactionSummary(
 }
 
 export type PriceInfo = { usd: number; vnd: number; source: string; fallback?: boolean }
+
+/** XSA price with real-time change tracking (polled every 5s from api.localusd.cloud). */
+export type XsaPriceInfo = {
+  usd: number
+  vnd: number
+  /** USD price change in the last 24h. */
+  dailyChange: number
+  /** USD price change in the last 1h. */
+  hourChange: number
+  source: string
+  fallback?: boolean
+}
+
+export const XSA_PRICE_API = 'https://api.localusd.cloud/xsa/price.json'
+export const VND_RATE = 30000
 
 // --- SOL airdrop API (Telegram-based, 10 SOL per user / 3 days) ------------
 

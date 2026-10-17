@@ -211,6 +211,9 @@ export default function HomePage() {
                       ? 'Đang chờ airdrop…'
                       : c.tagline)
                   : c.tagline
+            // XSA real-time price change (green) — daily & hourly
+            const xsaDailyVnd = isXsa && !hidden ? balance.xsa * xsaPrice.dailyChange * 30000 : 0
+            const xsaHourVnd = isXsa && !hidden ? balance.xsa * xsaPrice.hourChange * 30000 : 0
             return (
               <button
                 key={c.id}
@@ -242,6 +245,13 @@ export default function HomePage() {
                   <p className="text-[10.5px] text-[color:var(--muted)]">
                     {c.hasUsdValue ? (hidden ? '≈ ••••' : formatVnd(coinBalance * coinPrice.vnd)) : '—'}
                   </p>
+                  {isXsa && !hidden && (xsaDailyVnd !== 0 || xsaHourVnd !== 0) ? (
+                    <p className="text-[9px] font-semibold text-[#22e07a]">
+                      {xsaDailyVnd >= 0 ? '+' : ''}{formatVnd(xsaDailyVnd)} /ngày
+                      {' · '}
+                      {xsaHourVnd >= 0 ? '+' : ''}{formatVnd(xsaHourVnd)} /giờ
+                    </p>
+                  ) : null}
                 </div>
               </button>
             )

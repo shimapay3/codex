@@ -14,6 +14,7 @@ import {
   USDC_MINT,
   XSA_MINT,
   PriceInfo,
+  XsaPriceInfo,
   TxEntry,
   fetchTokenHistory,
   getSolBalance,
@@ -48,6 +49,7 @@ import { readLocal, writeLocal, removeLocal, clearDeviceData, StorageKeys, getOr
 import { finishFileExport } from '../lib/fileExport'
 import { getTelegramUser, getTelegramUserIdString, telegramReady, isTelegramWebApp, type TelegramUser } from '../lib/telegram'
 import { useRealtimePoll, type SyncResponse } from './useRealtimePoll'
+import { useXsaPricePoll } from './useXsaPricePoll'
 import { useAutoLock } from './useAutoLock'
 import {
   BalanceSample,
@@ -112,7 +114,7 @@ export type Toast = {
   createdAt: number
 }
 
-export type BalanceState = { usdc: number; xsa: number; sol: number; decimals: number; loading: boolean }
+export type BalanceState = { usdc: number; xsa: number; sol: number; decimals: number; xsaDecimals: number; loading: boolean }
 
 export type AirdropState = {
   status: 'idle' | 'pending' | 'sending' | 'confirmed' | 'error'
@@ -132,7 +134,7 @@ type WalletContextValue = {
   samples: BalanceSample[]
   prefs: Prefs
   price: PriceInfo
-  xsaPrice: PriceInfo
+  xsaPrice: XsaPriceInfo
   balance: BalanceState
   history: TxEntry[]
   historyLoading: boolean
@@ -211,12 +213,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null)
   const [pinEnabled, setPinEnabled] = useState<boolean>(() => !!loadPinWrap())
   const [price, setPrice] = useState<PriceInfo>({ usd: 1, vnd: 30000, source: 'fixed' })
-  const [xsaPrice, setXsaPrice] = useState<PriceInfo>({ usd: 1, vnd: 30000, source: 'fixed' })
+  const xsaPrice = useXsaPricePoll(session === 'unlocked')
   const [balance, setBalance] = useState<BalanceState>({
     usdc: 0,
     xsa: 0,
     sol: 0,
     decimals: USDC_DECIMALS_FALLBACK,
+    xsaDecimals: 8,
     loading: false,
   })
   const [history, setHistory] = useState<TxEntry[]>([])
@@ -862,7 +865,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         getSolBalance(rpcUrl, wallet.address),
       ])
       if (!isCurrentWallet(wallet.address, rpcUrl)) return
-      setBalance({ usdc: usdc.amount, xsa: xsa.amount, sol, decimals: usdc.decimals, loading: false })
+      setBalance({ usdc: usdc.amount, xsa: xsa.amount, sol, decimals: usdc.decimals, xsaDecimals: xsa.decimals, loading: false })
 
       const previous = vaultRef.current
       if (previous) {
@@ -965,15 +968,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         xsa: data.xsaBalance ?? 0,
         sol: data.solBalance,
         decimals: data.decimals || USDC_DECIMALS_FALLBACK,
+        xsaDecimals: data.xsaDecimals || 8,
         loading: false,
       })
 
-      // Update price
+      // Update price (XSA price is polled separately by useXsaPricePoll)
       if (data.price) {
         setPrice(data.price)
-      }
-      if (data.xsaPrice) {
-        setXsaPrice(data.xsaPrice)
       }
 
       // Update airdrop status from sync
@@ -1226,7 +1227,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setPinEnabled(false)
     setHistory([])
     setHistoryLoading(false)
-    setBalance({ usdc: 0, xsa: 0, sol: 0, decimals: USDC_DECIMALS_FALLBACK, loading: false })
+    setBalance({ usdc: 0, xsa: 0, sol: 0, decimals: USDC_DECIMALS_FALLBACK, xsaDecimals: 8, loading: false })
     setLastPayment(null)
     setAirdrop({ status: 'idle', payserver: null, signature: null, error: null })
     setToasts([])
@@ -1276,9 +1277,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
       const rpcUrlNow = current.prefs.rpcUrl || DEFAULT_RPC_URL
       const keypair = Keypair.fromSecretKey(Uint8Array.from(wallet.secret))
-      const decimals = balance.decimals || USDC_DECIMALS_FALLBACK
       const mintAddress = params.mint || USDC_MINT
       const tokenSymbol = mintAddress === XSA_MINT ? 'XSA' : 'USDC'
+      // Use the correct decimals per token: XSA has 8, USDC has 9 on Cloud Chain.
+      const decimals = mintAddress === XSA_MINT
+        ? (balance.xsaDecimals || 8)
+        : (balance.decimals || USDC_DECIMALS_FALLBACK)
 
       // Requirement 2: save pre-send balance to localStorage before each send
       writeLocal(StorageKeys.preSendBalance, {
@@ -1481,7 +1485,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         throw new Error(message)
       }
     },
-    [balance.decimals, balance.usdc, persist, prefs.notifications, prefs.sound, prefs.webhookAutoSend, prefs.webhookBotToken, prefs.webhookTopicUrl, pushToast, refresh, saveWalletHistory],
+    [balance.decimals, balance.xsaDecimals, balance.usdc, persist, prefs.notifications, prefs.sound, prefs.webhookAutoSend, prefs.webhookBotToken, prefs.webhookTopicUrl, pushToast, refresh, saveWalletHistory],
   )
 
   // --- send SOL -------------------------------------------------------------
