@@ -1286,7 +1286,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
       // Requirement 2: save pre-send balance to localStorage before each send
       writeLocal(StorageKeys.preSendBalance, {
-        balance: balance.usdc,
+        balance: mintAddress === XSA_MINT ? balance.xsa : balance.usdc,
         amount: params.amount,
         timestamp: Date.now(),
       })
@@ -1422,7 +1422,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
         // Requirement 2: exception handling — check balance to detect success
         try {
-          const postBalance = await getUsdcBalance(rpcUrlNow, wallet.address)
+          const postBalance = await getUsdcBalance(rpcUrlNow, wallet.address, mintAddress)
           const preData = readLocal<{ balance: number; amount: number; timestamp: number }>(
             StorageKeys.preSendBalance,
             { balance: 0, amount: 0, timestamp: 0 },

@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { PublicKey } from '@solana/web3.js'
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token'
-import { USDC_MINT, projectWalletTx, mergeTransactions, parseUsdcTransaction, collectRpcHistory } from './tx-history.mjs'
+import { USDC_MINT, XSA_MINT, projectWalletTx, mergeTransactions, parseUsdcTransaction, collectRpcHistory } from './tx-history.mjs'
 
 const A = '11111111111111111111111111111111'
 const B = 'So11111111111111111111111111111111111111112'
@@ -86,6 +86,7 @@ test('SOL-only and zero-token-delta transactions do not contaminate USDC history
 
 test('owner and Token-2022 ATA are queried together even when both return non-empty lists', async () => {
   const ata = (await getAssociatedTokenAddress(new PublicKey(USDC_MINT), new PublicKey(A), false, TOKEN_2022_PROGRAM_ID)).toBase58()
+  const xsaAta = (await getAssociatedTokenAddress(new PublicKey(XSA_MINT), new PublicKey(A), false, TOKEN_2022_PROGRAM_ID)).toBase58()
   const queried = new Set()
   const rpc = async (_url, method, params) => {
     if (method === 'getTokenAccountsByOwner') return { value: [] }
@@ -96,7 +97,7 @@ test('owner and Token-2022 ATA are queried together even when both return non-em
     if (method === 'getTransaction') return params[0] === 'owner-send' ? transaction('2000000000', '1000000000') : transaction('1000000000', '2000000000')
   }
   const entries = await collectRpcHistory('mock', A, rpc)
-  assert.deepEqual(queried, new Set([A, ata]))
+  assert.deepEqual(queried, new Set([A, ata, xsaAta]))
   assert.equal(entries.length, 2)
   assert.deepEqual(new Set(entries.map((t) => t.direction)), new Set(['in', 'out']))
 })
