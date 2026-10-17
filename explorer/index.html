@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Cloud Chain Explorer</title>
+  <link rel="icon" href="https://explorer.solana.com/icon-144.png">
+  <style>
+    :root {
+      --accent: #9945ff;
+      --accent-2: #14f195;
+      --bg: #05060f;
+      --bg-soft: #0b0e1c;
+      --surface: rgba(255,255,255,0.045);
+      --surface-strong: rgba(255,255,255,0.075);
+      --border: rgba(255,255,255,0.1);
+      --text: #f4f6ff;
+      --muted: rgba(226,232,255,0.62);
+      --star: rgba(255,255,255,0.72);
+      color-scheme: dark;
+    }
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overscroll-behavior-y: none;
+    }
+    .space-bg {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(1200px 620px at 12% -8%, color-mix(in srgb, var(--accent) 32%, transparent), transparent 62%),
+        radial-gradient(900px 560px at 92% 4%, color-mix(in srgb, var(--accent-2) 20%, transparent), transparent 60%),
+        radial-gradient(760px 520px at 50% 108%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 65%),
+        var(--bg);
+    }
+    .space-bg::after {
+      content: ''; position: absolute; inset: 0; opacity: 0.5;
+      background-image:
+        radial-gradient(1.5px 1.5px at 18% 22%, var(--star) 50%, transparent 51%),
+        radial-gradient(1.2px 1.2px at 72% 12%, var(--star) 50%, transparent 51%),
+        radial-gradient(1.6px 1.6px at 42% 62%, var(--star) 50%, transparent 51%),
+        radial-gradient(1.1px 1.1px at 85% 48%, var(--star) 50%, transparent 51%),
+        radial-gradient(1.3px 1.3px at 8% 78%, var(--star) 50%, transparent 51%),
+        radial-gradient(1.2px 1.2px at 62% 86%, var(--star) 50%, transparent 51%);
+    }
+    .glass { background: var(--surface); border: 1px solid var(--border); backdrop-filter: blur(18px) saturate(150%); -webkit-backdrop-filter: blur(18px) saturate(150%); }
+    .glass-strong { background: var(--surface-strong); border: 1px solid var(--border); backdrop-filter: blur(22px) saturate(160%); -webkit-backdrop-filter: blur(22px) saturate(160%); }
+    .accent-gradient { background-image: linear-gradient(120deg, var(--accent), var(--accent-2)); }
+    .accent-text { background-image: linear-gradient(120deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .container { position: relative; z-index: 10; max-width: 640px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    .header { text-align: center; margin-bottom: 1.5rem; }
+    .header h1 { font-size: 1.5rem; font-weight: 700; margin: 0.5rem 0 0; }
+    .header p { font-size: 0.75rem; color: var(--muted); margin: 0.25rem 0 0; }
+    .logo { width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); display: inline-flex; align-items: center; justify-content: center; }
+    .logo svg { width: 32px; height: 32px; }
+    .search-bar { display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--border); background: var(--surface); border-radius: 1rem; padding: 0 0.75rem; }
+    .search-bar input { flex: 1; background: transparent; border: none; outline: none; color: var(--text); font-family: monospace; font-size: 0.75rem; padding: 0.75rem 0; }
+    .search-bar input::placeholder { color: var(--muted); }
+    .card { border-radius: 1.5rem; padding: 1.25rem; margin-bottom: 1rem; }
+    .card-title { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.5rem; }
+    .mono { font-family: monospace; font-size: 0.75rem; word-break: break-all; }
+    .balance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .balance-card { background: var(--surface); border-radius: 1rem; padding: 0.75rem; }
+    .balance-card .label { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    .balance-card .value { font-size: 1.1rem; font-weight: 700; margin-top: 0.25rem; }
+    .balance-card .unit { font-size: 0.75rem; color: var(--muted); }
+    .token-row { display: flex; align-items: center; gap: 0.625rem; padding: 0.625rem; background: var(--surface); border-radius: 0.75rem; margin-bottom: 0.5rem; }
+    .token-icon { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; }
+    .tx-item { display: flex; align-items: center; gap: 0.625rem; padding: 0.625rem 0.75rem; background: var(--surface); border-radius: 0.75rem; margin-bottom: 0.4rem; cursor: pointer; transition: background 0.15s; }
+    .tx-item:hover { background: var(--surface-strong); }
+    .tx-dir { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.8rem; }
+    .tx-dir.in { background: rgba(34,224,122,0.16); color: #22e07a; }
+    .tx-dir.out { background: rgba(255,107,129,0.16); color: #ff6b81; }
+    .tx-amount { font-weight: 700; font-size: 0.8rem; }
+    .tx-time { font-size: 0.65rem; color: var(--muted); }
+    .tx-memo { font-size: 0.7rem; color: var(--muted); margin-top: 0.15rem; }
+    .status-badge { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 0.5rem; }
+    .status-badge.success { background: rgba(34,224,122,0.16); color: #22e07a; }
+    .status-badge.failed { background: rgba(255,77,109,0.16); color: #ff4d6d; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { font-size: 0.7rem; color: var(--muted); }
+    .info-value { font-size: 0.75rem; font-family: monospace; }
+    .link { color: var(--accent); cursor: pointer; text-decoration: none; }
+    .link:hover { text-decoration: underline; }
+    .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; padding: 3rem 0; color: var(--muted); }
+    .spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error { text-align: center; padding: 2rem; color: #ff6b81; }
+    .empty { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.8rem; }
+    .section { margin-top: 1rem; }
+    .section-title { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.5rem; }
+    .back-btn { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: var(--muted); cursor: pointer; margin-bottom: 1rem; }
+    .back-btn:hover { color: var(--text); }
+    .cloud-badge { font-size: 0.6rem; background: rgba(99,102,241,0.16); color: #818cf8; padding: 0.1rem 0.4rem; border-radius: 0.3rem; margin-left: 0.4rem; }
+    .verified-badge { display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.6rem; background: rgba(29,155,240,0.16); color: #1d9bf0; padding: 0.1rem 0.35rem; border-radius: 0.3rem; margin-left: 0.3rem; }
+    .xsa-icon { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(108,92,231,0.2); color: #a29bfe; font-size: 0.7rem; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="space-bg"></div>
+  <div class="container" id="app"></div>
+  <script>
+    const API_BASE = ''
+    const SOL_ICON = 'https://explorer.solana.com/icon-144.png'
+    const USDC_ICON = 'https://usdc.dolaxanh.com/a/ACg8ocJtRSV_No5FrhpG55lc3nUSspbIExRO0CVJIMLt4SXgiobyEoI5=s72-c-no'
+    const USDC_MINT = 'USDnBPwJrUpXUuiptBrLXRqDwUebPjXXPSaNSvuxtb2'
+    const XSA_MINT = 'XSAdG6BXMCFxD5Q8qHtJqEHisSk3qdEVDZt8YvTjX47'
+    const XSA_ICON = 'https://usdc.dolaxanh.com/a/ACg8ocJtRSV_No5FrhpG55lc3nUSspbIExRO0CVJIMLt4SXgiobyEoI5=s72-c-no'
+    const VERIFIED_SVG = '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 1.8 3 .2.2 3L19.4 9l-1.8 2.4.2 3-3 .2L12 18l-2.4-1.4-3-.2-.2-3L4.6 9l1.8-2.4-.2-3 3-.2z" opacity="0.3"/><path d="M9.5 12.5l2 2 4-4" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+
+    function tokenIcon(symbol) {
+      if (symbol === 'XSA') return XSA_ICON
+      if (symbol === 'USDC') return USDC_ICON
+      return SOL_ICON
+    }
+
+    function tokenBadge(symbol) {
+      if (symbol === 'USDC' || symbol === 'XSA') return '<span class="verified-badge">' + VERIFIED_SVG + ' Đã xác minh</span>'
+      return ''
+    }
+
+    function shortAddr(addr, n = 4) {
+      if (!addr) return '—'
+      return addr.length <= n * 2 + 2 ? addr : addr.slice(0, n) + '…' + addr.slice(-n)
+    }
+
+    function fmtTime(ts) {
+      if (!ts) return '—'
+      return new Date(ts * 1000).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    }
+
+    function fmtAmt(n, dec) {
+      return Number(n || 0).toLocaleString('vi-VN', { maximumFractionDigits: 20 })
+    }
+
+    function getRpcFromQuery() {
+      const params = new URLSearchParams(location.search)
+      return params.get('customUrl') || params.get('rpc') || ''
+    }
+
+    function navigate(path) {
+      history.pushState({}, '', path)
+      render()
+    }
+
+    async function apiGet(path) {
+      const res = await fetch(API_BASE + path)
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`)
+      return res.json()
+    }
+
+    // --- Views ---
+    function renderHome() {
+      document.getElementById('app').innerHTML = `
+        <div class="header">
+          <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg></div>
+          <h1>Cloud Chain <span class="accent-text">Explorer</span></h1>
+          <p>Tra cứu địa chỉ & giao dịch trên Cloud Chain</p>
+        </div>
+        <div class="glass card">
+          <div class="search-bar">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--muted);flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input id="searchInput" placeholder="Dán địa chỉ ví hoặc chữ ký giao dịch…" spellcheck="false">
+          </div>
+        </div>
+        <div class="empty">Dán địa chỉ hoặc chữ ký giao dịch để tra cứu</div>
+      `
+      const input = document.getElementById('searchInput')
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') doSearch(input.value.trim())
+      })
+      input.focus()
+    }
+
+    async function doSearch(query) {
+      if (!query) return
+      if (query.length > 60) {
+        navigate('/tx/' + query)
+      } else if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(query)) {
+        navigate('/address/' + query)
+      } else {
+        alert('Địa chỉ hoặc chữ ký không hợp lệ')
+      }
+    }
+
+    async function renderAddress(address) {
+      document.getElementById('app').innerHTML = `<div class="loading"><div class="spinner"></div>Đang tra cứu địa chỉ…</div>`
+      try {
+        const rpc = getRpcFromQuery()
+        const rpcQ = rpc ? '?rpc=' + encodeURIComponent(rpc) : ''
+        const data = await apiGet('/api/explorer/address/' + address + rpcQ)
+
+        let tokensHtml = (data.tokens || []).map(t => {
+          const isXsa = t.symbol === 'XSA'
+          const iconHtml = isXsa
+            ? `<div class="xsa-icon">X</div>`
+            : `<img src="${t.icon || SOL_ICON}" class="token-icon" alt="${t.symbol}" onerror="this.src='${SOL_ICON}'">`
+          return `
+          <div class="token-row">
+            ${iconHtml}
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:0.8rem">${t.symbol} ${tokenBadge(t.symbol)}</div>
+              <div class="mono" style="font-size:0.65rem;color:var(--muted)">${fmtAmt(t.balance, t.decimals)} ${t.symbol}</div>
+            </div>
+          </div>
+        `}).join('')
+
+        let txsHtml = ''
+        if (data.transactions && data.transactions.length > 0) {
+          txsHtml = data.transactions.map(tx => {
+            const isIn = tx.direction === 'in'
+            const sym = tx.tokenSymbol || 'USDC'
+            const isXsa = sym === 'XSA'
+            const iconHtml = isXsa
+              ? `<div style="width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(108,92,231,0.2);color:#a29bfe;font-size:0.5rem;font-weight:700">X</div>`
+              : `<img src="${tokenIcon(sym)}" style="width:16px;height:16px;border-radius:50%" onerror="this.src='${SOL_ICON}'">`
+            return `
+              <div class="tx-item" onclick="navigate('/tx/${tx.signature}')">
+                <div class="tx-dir ${isIn ? 'in' : 'out'}">${isIn ? '↑' : '↓'}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:0.4rem">
+                    ${iconHtml}
+                    <span class="tx-amount">${isIn ? '+' : '−'}${fmtAmt(tx.amount, tx.decimals)} ${sym}</span>
+                  </div>
+                  <div class="tx-time">${fmtTime(tx.blockTime)} · ${shortAddr(tx.counterparty || tx.walletAddress)}</div>
+                  ${tx.memo ? `<div class="tx-memo">${tx.memo}</div>` : ''}
+                </div>
+              </div>
+            `
+          }).join('')
+        } else {
+          txsHtml = '<div class="empty">Chưa có giao dịch trong cơ sở dữ liệu đám mây</div>'
+        }
+
+        document.getElementById('app').innerHTML = `
+          <div class="back-btn" onclick="navigate('/')">← Quay lại</div>
+          <div class="header">
+            <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg></div>
+            <h1>Địa chỉ ví</h1>
+          </div>
+          <div class="glass-strong card">
+            <div class="card-title">Địa chỉ</div>
+            <div class="mono">${data.address}</div>
+          </div>
+          <div class="section">
+            <div class="section-title">Số dư token</div>
+            <div class="glass card" style="padding:0.75rem">
+              ${tokensHtml || '<div class="empty">Không có token</div>'}
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title">Lịch sử giao dịch <span class="cloud-badge">Cloud DB</span></div>
+            <div class="glass card" style="padding:0.5rem">
+              ${txsHtml}
+            </div>
+          </div>
+        `
+      } catch (err) {
+        document.getElementById('app').innerHTML = `<div class="back-btn" onclick="navigate('/')">← Quay lại</div><div class="error">${err.message}</div>`
+      }
+    }
+
+    async function renderTx(signature) {
+      document.getElementById('app').innerHTML = `<div class="loading"><div class="spinner"></div>Đang tra cứu giao dịch…</div>`
+      try {
+        const rpc = getRpcFromQuery()
+        const rpcQ = rpc ? '?rpc=' + encodeURIComponent(rpc) : ''
+        const tx = await apiGet('/api/explorer/tx/' + signature + rpcQ)
+
+        let transfersHtml = ''
+        if (tx.tokenTransfers && tx.tokenTransfers.length > 0) {
+          transfersHtml = tx.tokenTransfers.map(t => {
+            const isXsa = t.mint === XSA_MINT
+            const isUsdc = t.mint === USDC_MINT
+            const symbol = t.symbol || (isXsa ? 'XSA' : isUsdc ? 'USDC' : shortAddr(t.mint, 4))
+            const iconHtml = isXsa
+              ? `<div class="xsa-icon">X</div>`
+              : `<img src="${t.icon || (isUsdc ? USDC_ICON : SOL_ICON)}" class="token-icon" alt="${symbol}" onerror="this.src='${SOL_ICON}'">`
+            return `
+              <div class="token-row">
+                ${iconHtml}
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:700;font-size:0.8rem">${fmtAmt(t.amount, t.decimals)} ${symbol} ${tokenBadge(symbol)}</div>
+                  <div class="mono" style="font-size:0.65rem;color:var(--muted)">
+                    <span class="link" onclick="navigate('/address/${t.from}')">${shortAddr(t.from)}</span>
+                    → <span class="link" onclick="navigate('/address/${t.to}')">${shortAddr(t.to)}</span>
+                  </div>
+                </div>
+              </div>
+            `
+          }).join('')
+        }
+        if (tx.solTransfers && tx.solTransfers.length > 0) {
+          transfersHtml += tx.solTransfers.map(t => `
+            <div class="token-row">
+              <img src="${SOL_ICON}" class="token-icon" alt="SOL">
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700;font-size:0.8rem">${t.amount.toLocaleString('vi-VN', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} SOL</div>
+                <div class="mono" style="font-size:0.65rem;color:var(--muted)">
+                  <span class="link" onclick="navigate('/address/${t.from}')">${shortAddr(t.from)}</span>
+                  → <span class="link" onclick="navigate('/address/${t.to}')">${shortAddr(t.to)}</span>
+                </div>
+              </div>
+            </div>
+          `).join('')
+        }
+        if (!transfersHtml) transfersHtml = '<div class="empty">Không có chuyển token hoặc SOL</div>'
+
+        // If from cloud, show the cloud record details
+        let cloudInfo = ''
+        if (tx.fromCloud) {
+          cloudInfo = `
+            <div class="glass card">
+              <div class="card-title">Thông tin đám mây</div>
+              <div class="info-row"><span class="info-label">Ví gửi</span><span class="info-value link" onclick="navigate('/address/${tx.walletAddress}')">${shortAddr(tx.walletAddress)}</span></div>
+              <div class="info-row"><span class="info-label">Tên ví</span><span class="info-value">${tx.walletName || '—'}</span></div>
+              <div class="info-row"><span class="info-label">Loại</span><span class="info-value">${tx.direction === 'out' ? '📤 Gửi' : tx.direction === 'in' ? '📥 Nhận' : '🔄 Khác'}</span></div>
+              <div class="info-row"><span class="info-label">Token</span><span class="info-value">${tx.tokenSymbol || '—'}</span></div>
+              <div class="info-row"><span class="info-label">Đối tác</span><span class="info-value link" onclick="navigate('/address/${tx.counterparty}')">${shortAddr(tx.counterparty)}</span></div>
+            </div>
+          `
+        }
+
+        document.getElementById('app').innerHTML = `
+          <div class="back-btn" onclick="navigate('/')">← Quay lại</div>
+          <div class="header">
+            <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+            <h1>Chi tiết giao dịch ${tx.fromCloud ? '<span class="cloud-badge">Cloud DB</span>' : ''}</h1>
+          </div>
+          <div class="glass-strong card">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem">
+              <span class="status-badge ${tx.status === 'success' ? 'success' : 'failed'}">${tx.status === 'success' ? '✅ Thành công' : '❌ Thất bại'}</span>
+              <span style="font-size:0.7rem;color:var(--muted);margin-left:auto">${fmtTime(tx.blockTime)}</span>
+            </div>
+            <div class="card-title">Chữ ký</div>
+            <div class="mono" style="margin-bottom:0.75rem">${tx.signature}</div>
+            <div class="info-row"><span class="info-label">Số dư ${tx.tokenSymbol || 'USDC'}</span><span class="info-value" style="color:${tx.direction === 'in' ? '#22e07a' : tx.direction === 'out' ? 'var(--accent)' : 'var(--text)'}">${tx.direction === 'in' ? '+' : tx.direction === 'out' ? '−' : ''}${fmtAmt(tx.amount || (tx.tokenTransfers || []).filter(t => t.mint === USDC_MINT || t.mint === XSA_MINT).reduce((s, t) => s + t.amount, 0), tx.decimals || 6)} ${tx.tokenSymbol || 'USDC'}</span></div>
+            <div class="info-row"><span class="info-label">Số dư SOL</span><span class="info-value" style="color:${tx.direction === 'in' ? '#22e07a' : 'var(--accent)'}">${tx.direction === 'in' ? '+' : '−'}${fmtAmt((tx.fee || 0) + (tx.solTransfers || []).reduce((s, t) => s + t.amount, 0), 9)} SOL</span></div>
+            ${tx.memo ? `<div class="info-row"><span class="info-label">Memo</span><span class="info-value">${tx.memo}</span></div>` : ''}
+          </div>
+          ${cloudInfo}
+          <div class="section">
+            <div class="section-title">Chuyển token & SOL</div>
+            <div class="glass card" style="padding:0.75rem">
+              ${transfersHtml}
+            </div>
+          </div>
+        `
+      } catch (err) {
+        document.getElementById('app').innerHTML = `<div class="back-btn" onclick="navigate('/')">← Quay lại</div><div class="error">${err.message}</div>`
+      }
+    }
+
+    function render() {
+      const path = location.pathname
+      if (path.startsWith('/address/')) {
+        renderAddress(decodeURIComponent(path.slice('/address/'.length)))
+      } else if (path.startsWith('/tx/')) {
+        renderTx(decodeURIComponent(path.slice('/tx/'.length)))
+      } else {
+        renderHome()
+      }
+    }
+
+    window.navigate = navigate
+    window.addEventListener('popstate', render)
+    render()
+  </script>
+</body>
+</html>

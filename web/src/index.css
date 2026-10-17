@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --accent: #9945ff;
+  --accent-2: #14f195;
+  --bg: #05060f;
+  --bg-soft: #0b0e1c;
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface-strong: rgba(255, 255, 255, 0.075);
+  --border: rgba(255, 255, 255, 0.1);
+  --text: #f4f6ff;
+  --muted: rgba(226, 232, 255, 0.62);
+  --star: rgba(255, 255, 255, 0.72);
+  --overlay: rgba(0, 0, 0, 0.5);
+  --overlay-blur: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+html.light {
+  --bg: #f5f6fb;
+  --bg-soft: #ffffff;
+  --surface: rgba(15, 18, 40, 0.04);
+  --surface-strong: rgba(15, 18, 40, 0.075);
+  --border: rgba(15, 18, 40, 0.1);
+  --text: #10142c;
+  --muted: rgba(24, 30, 60, 0.62);
+  --star: rgba(20, 24, 60, 0.55);
+  --overlay: rgba(15, 18, 40, 0.2);
+  --overlay-blur: rgba(15, 18, 40, 0.22);
+  color-scheme: light;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
+}
+
+/* Space backdrop shared by every screen */
+.space-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 620px at 12% -8%, color-mix(in srgb, var(--accent) 32%, transparent), transparent 62%),
+    radial-gradient(900px 560px at 92% 4%, color-mix(in srgb, var(--accent-2) 20%, transparent), transparent 60%),
+    radial-gradient(760px 520px at 50% 108%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 65%),
+    var(--bg);
+}
+
+.space-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(1.5px 1.5px at 18% 22%, var(--star) 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 72% 12%, var(--star) 50%, transparent 51%),
+    radial-gradient(1.6px 1.6px at 42% 62%, var(--star) 50%, transparent 51%),
+    radial-gradient(1.1px 1.1px at 85% 48%, var(--star) 50%, transparent 51%),
+    radial-gradient(1.3px 1.3px at 8% 78%, var(--star) 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 62% 86%, var(--star) 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 30% 38%, var(--star) 50%, transparent 51%),
+    radial-gradient(1px 1px at 92% 72%, var(--star) 50%, transparent 51%);
+}
+
+.glass {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+.glass-strong {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+}
+
+.modal-overlay {
+  background: var(--overlay);
+}
+
+.modal-overlay-blur {
+  background: var(--overlay-blur);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.accent-gradient {
+  background-image: linear-gradient(120deg, var(--accent), var(--accent-2));
+}
+
+.accent-text {
+  background-image: linear-gradient(120deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.file-export-dialog {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.file-export-dialog::backdrop {
+  background: var(--overlay-blur);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.file-export-dialog :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.25rem);
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -180% 0;
+  }
+  100% {
+    background-position: 180% 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--surface), var(--surface-strong), var(--surface));
+  background-size: 220% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}

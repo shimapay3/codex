@@ -1,0 +1,17 @@
+{
+  "name": "cloud-pay-wallet-api",
+  "private": true,
+  "version": "1.0.1",
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs",
+    "dev": "node --watch index.mjs",
+    "test": "node --test *.test.mjs"
+  },
+  "dependencies": {
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.95.8",
+    "express": "^4.21.1",
+    "ws": "^8.18.0"
+  }
+}
