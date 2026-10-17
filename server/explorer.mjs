@@ -208,7 +208,7 @@ export function updateCloudTxStatus(signature, status, slot, blockTime) {
 
   tx.status = status
   if (slot != null) tx.slot = slot
-  if (blockTime != null) tx.blockTime = blockTime
+  if (blockTime != null && !tx.clientTime) tx.blockTime = blockTime
 
   // Also update in all users' txHistory
   for (const userId of Object.keys(state.users || {})) {
@@ -218,7 +218,7 @@ export function updateCloudTxStatus(signature, status, slot, blockTime) {
       if (histTx) {
         histTx.status = status
         if (slot != null) histTx.slot = slot
-        if (blockTime != null) histTx.blockTime = blockTime
+        if (blockTime != null && !histTx.clientTime) histTx.blockTime = blockTime
       }
     }
   }

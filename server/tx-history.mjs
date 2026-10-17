@@ -28,7 +28,10 @@ export function mergeTransactions(...sources) {
       const previous = bySignature.get(entry.signature)
       // A stale pending response must never replace a terminal result.
       if (previous && previous.status !== 'pending' && entry.status === 'pending') continue
-      bySignature.set(entry.signature, { ...previous, ...entry })
+      const merged = { ...previous, ...entry }
+      // The sender's wall-clock time beats the (skewed) chain clock.
+      if (previous?.clientTime && !entry.clientTime) { merged.blockTime = previous.blockTime; merged.clientTime = true }
+      bySignature.set(entry.signature, merged)
     }
   }
   return [...bySignature.values()].sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0) || (b.slot || 0) - (a.slot || 0))

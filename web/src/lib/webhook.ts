@@ -55,6 +55,8 @@ export function buildTxMessage(
   walletName: string,
   walletAddress: string,
   contactName?: string,
+  /** VND per 1 token (defaults to the USDC rate). */
+  vndPerToken = 30000,
 ): string {
   const direction =
     entry.direction === 'in' ? '📥 Nhận' : entry.direction === 'out' ? '📤 Gửi' : '🔄 Giao dịch'
@@ -67,12 +69,12 @@ export function buildTxMessage(
     : '◎0,000005 SOL (ước tính)'
 
   return [
-    '🔔 <b>Giao dịch 💠 USDC</b>',
+    `🔔 <b>Giao dịch 💠 ${entry.tokenSymbol || 'USDC'}</b>`,
     '',
     `<b>Ví:</b> ${walletName}`,
     `<b>Địa chỉ:</b> <code>${walletAddress}</code>`,
     `<b>Loại:</b> ${direction}`,
-    `<b>Số lượng:</b> 💠 ${formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} USDC (≈ ${formatVnd(entry.amount * 30000)})`,
+    `<b>Số lượng:</b> 💠 ${formatAmount(entry.amount, entry.amount < 1 ? 4 : 2)} ${entry.tokenSymbol || 'USDC'} (≈ ${formatVnd(entry.amount * vndPerToken)})`,
     `<b>Phí SOL:</b> ${feeSol}`,
     `<b>Trạng thái:</b> ${status}`,
     entry.memo ? `<b>Memo:</b> ${entry.memo}` : '',

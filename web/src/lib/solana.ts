@@ -390,6 +390,8 @@ export type TxEntry = {
   explorerUrl: string
   /** Token symbol for this transaction (defaults to 'USDC' for legacy records). */
   tokenSymbol?: string
+  /** blockTime is the sender's wall clock (the chain clock runs hours behind). */
+  clientTime?: boolean
 }
 
 /**
@@ -687,6 +689,7 @@ export type CloudTxRecord = {
   walletAddress: string
   walletName: string
   explorerUrl: string
+  clientTime?: boolean
 }
 
 /** Save a transaction to the cloud (called after every successful send when in Telegram). */

@@ -108,7 +108,7 @@ export function TxRow({ entry, onSelect }: { entry: TxEntry; onSelect: (entry: T
 }
 
 export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: () => void }) {
-  const { price, prefs, contacts, activeWallet, pushToast } = useWallet()
+  const { price, xsaPrice, prefs, contacts, activeWallet, pushToast } = useWallet()
   const [copied, setCopied] = useState(false)
   const [webhookSent, setWebhookSent] = useState(false)
   const [sendingWebhook, setSendingWebhook] = useState(false)
@@ -121,8 +121,9 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
 
   const parsed = splitMemo(entry.memo)
   const symbol = entry.tokenSymbol || 'USDC'
-  const totalUsd = formatUsd(entry.amount)
-  const totalVnd = formatVnd(entry.amount * price.vnd)
+  const unit = symbol === 'XSA' ? xsaPrice : price
+  const totalUsd = formatUsd(entry.amount * unit.usd)
+  const totalVnd = formatVnd(entry.amount * unit.vnd)
   const contact = entry.counterparty ? contacts.find((c) => c.address === entry.counterparty) : null
 
   return (
@@ -249,7 +250,7 @@ export function TxDetail({ entry, onClose }: { entry: TxEntry | null; onClose: (
               setSendingWebhook(true)
               try {
                 const contact = entry.counterparty ? contacts.find((c) => c.address === entry.counterparty) : null
-                const message = buildTxMessage(entry, activeWallet.name, activeWallet.address, contact?.name)
+                const message = buildTxMessage(entry, activeWallet.name, activeWallet.address, contact?.name, unit.vnd)
                 const result = await sendWebhook(prefs.webhookBotToken, prefs.webhookTopicUrl, message)
                 if (result.ok) {
                   markWebhookSent(entry.signature)

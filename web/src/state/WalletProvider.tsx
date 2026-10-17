@@ -214,6 +214,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [pinEnabled, setPinEnabled] = useState<boolean>(() => !!loadPinWrap())
   const [price, setPrice] = useState<PriceInfo>({ usd: 1, vnd: 30000, source: 'fixed' })
   const xsaPrice = useXsaPricePoll(session === 'unlocked')
+  const xsaPriceRef = useRef(xsaPrice)
+  xsaPriceRef.current = xsaPrice
   const [balance, setBalance] = useState<BalanceState>({
     usdc: 0,
     xsa: 0,
@@ -1301,6 +1303,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           decimals,
           mint: mintAddress,
         })
+        // Chain clock runs hours behind: stamp with the sender's wall-clock time.
+        const sentAt = Math.floor(Date.now() / 1000)
+        result.blockTime = sentAt
 
         // Only confirmed sends enter local history; pending status is resolved by sync.
         if (result.status === 'success') saveWalletHistory(wallet.address, rpcUrlNow, [{
@@ -1308,6 +1313,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           direction: params.to.trim() === wallet.address ? 'self' : 'out',
           amount: params.amount, decimals, fee: result.fee, status: result.status,
           memo: params.memo || '', counterparty: params.to.trim(), explorerUrl: explorerTxUrl(result.signature),
+          tokenSymbol, clientTime: true,
         }])
 
         // Requirement 1: if confirmation timed out (>30s), record as pending
@@ -1326,6 +1332,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
               memo: params.memo || '',
               counterparty: params.to.trim(),
               tokenSymbol,
+              clientTime: true,
               walletAddress: wallet.address,
               walletName: wallet.name,
             })
@@ -1384,6 +1391,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             memo: params.memo || '',
             counterparty: params.to.trim(),
             tokenSymbol,
+            clientTime: true,
             walletAddress: wallet.address,
             walletName: wallet.name,
           })
@@ -1404,8 +1412,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             memo: params.memo || '',
             counterparty: params.to.trim(),
             explorerUrl: explorerTxUrl(signature),
+            tokenSymbol,
           }
-          const message = buildTxMessage(txEntry, wallet.name, wallet.address, contact?.name)
+          const message = buildTxMessage(txEntry, wallet.name, wallet.address, contact?.name, tokenSymbol === 'XSA' ? xsaPriceRef.current.vnd : undefined)
           void sendWebhook(prefs.webhookBotToken, prefs.webhookTopicUrl, message).then((result) => {
             if (result.ok) {
               markWebhookSent(signature)
