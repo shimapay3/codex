@@ -1,0 +1,36 @@
+services:
+  web:
+    image: node:22
+    working_dir: /app
+    # Installs dependencies from the mounted lockfile, then runs the Cloudflare
+    # Workers dev server (workerd) with live reload on the source directory.
+    command:
+      - sh
+      - -ec
+      - |
+        npm install --no-audit --no-fund
+        exec npx wrangler dev --ip 0.0.0.0 --port 3000
+    ports:
+      - "3000:3000"
+    environment:
+      - BASE44_PREVIEW_MODE
+      - CI=true
+      - WRANGLER_SEND_METRICS=false
+      - CHOKIDAR_USEPOLLING=1
+    volumes:
+      - .:/app
+      - dependencies:/app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 120s
+    restart: on-failure
+    labels:
+      base44.project: "wt-prod reverse proxy"
+      base44.kind: "web"
+      base44.port: "3000"
+
+volumes:
+  dependencies:

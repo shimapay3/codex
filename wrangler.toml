@@ -1,0 +1,14 @@
+name = "wt-prod-reverse-proxy"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+# Reverse proxy target. The path prefix is matched on the incoming host, so the
+# worker can be mounted on any domain via a route (see README).
+[vars]
+UPSTREAM_ORIGIN = "https://example.org"
+PATH_PREFIX = "/wt_prod-15374"
+
+# To serve https://example.com/wt_prod-15374/* uncomment and replace the zone:
+# routes = [
+#   { pattern = "example.com/wt_prod-15374/*", zone_name = "example.com" }
+# ]
