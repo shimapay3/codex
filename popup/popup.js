@@ -116,25 +116,35 @@ function render() {
   });
 
   const selected = state.records.find((record) => record.id === state.selectedId) || null;
+  const paused = Boolean(selected && selected.paused);
+
   $('selected-name').textContent = selected ? selected.name : '—';
-  $('btn-apply').disabled = !selected;
-  $('btn-reload').disabled = !selected;
-  $('btn-page-reload').disabled = !selected;
+  $('btn-apply').disabled = !selected || paused;
+  $('btn-reload').disabled = !selected || paused;
+  $('btn-page-reload').disabled = !selected || paused;
+
+  const pauseBtn = $('btn-pause');
+  pauseBtn.disabled = !selected;
+  pauseBtn.textContent = paused ? '▶ Chạy' : '⏸ Dừng';
+  pauseBtn.title = paused ? 'Tiêm lại và tiếp tục chạy script' : 'Gỡ CSS và dừng script đang chạy';
 }
 
 function recordRow(record) {
   const matches = tabsForRecord(record);
   const isHost = state.matchBy === 'host';
 
+  const paused = Boolean(record.paused);
+
   const row = document.createElement('li');
-  row.className = 'record' + (record.id === state.selectedId ? ' is-selected' : '');
+  row.className =
+    'record' + (record.id === state.selectedId ? ' is-selected' : '') + (paused ? ' is-paused' : '');
   row.dataset.id = record.id;
   row.tabIndex = 0;
   row.setAttribute('role', 'button');
-  row.title = 'Mở tab này và tiêm JS + CSS';
+  row.title = paused ? 'Bản ghi đang tạm dừng' : 'Mở tab này và tiêm JS + CSS';
 
   const dot = document.createElement('span');
-  dot.className = 'dot' + (matches.length > 0 ? '' : ' is-off');
+  dot.className = 'dot' + (matches.length > 0 && !paused ? '' : ' is-off');
 
   const main = document.createElement('div');
   main.className = 'record-main';
@@ -157,6 +167,12 @@ function recordRow(record) {
   const files = document.createElement('div');
   files.className = 'record-files';
   files.append(fileChip(record.jsFile, 'js'), fileChip(record.cssFile, 'css'));
+  if (paused) {
+    const chip = document.createElement('span');
+    chip.className = 'chip paused';
+    chip.textContent = 'tạm dừng';
+    files.append(chip);
+  }
 
   main.append(name, meta, files);
 
@@ -223,6 +239,7 @@ function bindEvents() {
   $('btn-apply').addEventListener('click', () => applySelected(false));
   $('btn-reload').addEventListener('click', () => applySelected(true));
   $('btn-page-reload').addEventListener('click', reloadSelected);
+  $('btn-pause').addEventListener('click', togglePause);
   $('btn-refresh').addEventListener('click', async () => {
     await loadTabs();
     fillSelects();
@@ -270,6 +287,10 @@ function onListKeydown(event) {
 async function applySelected(activate) {
   const record = state.records.find((item) => item.id === state.selectedId);
   if (!record) return;
+  if (record.paused) {
+    showToast('Bản ghi đang tạm dừng — bấm ▶ Chạy để tiêm lại.', 'error');
+    return;
+  }
 
   const response = await chrome.runtime.sendMessage({
     type: 'apply-record',
@@ -299,6 +320,10 @@ async function applySelected(activate) {
 async function reloadSelected() {
   const record = state.records.find((item) => item.id === state.selectedId);
   if (!record) return;
+  if (record.paused) {
+    showToast('Bản ghi đang tạm dừng — bấm ▶ Chạy để tiêm lại.', 'error');
+    return;
+  }
 
   const response = await chrome.runtime.sendMessage({ type: 'reload-record', recordId: record.id });
   if (!response) {
@@ -312,6 +337,32 @@ async function reloadSelected() {
 
   const count = (response.tabIds || []).length;
   showToast(`Đang tải lại ${count} tab — sẽ tiêm lại khi tải xong.`, 'ok');
+}
+
+async function togglePause() {
+  const record = state.records.find((item) => item.id === state.selectedId);
+  if (!record) return;
+
+  const response = await chrome.runtime.sendMessage({ type: 'toggle-pause', recordId: record.id });
+  if (!response) {
+    showToast('Extension không phản hồi. Hãy thử mở lại popup.', 'error');
+    return;
+  }
+
+  if (typeof response.paused === 'boolean') record.paused = response.paused;
+  render();
+
+  if (!response.ok) {
+    showToast(response.message || 'Không đổi được trạng thái chạy/dừng.', 'error');
+    return;
+  }
+
+  const files = [record.jsFile, record.cssFile].filter(Boolean).map(basename).join(' + ');
+  const count = (response.tabIds || []).length;
+  showToast(
+    record.paused ? `Đã tạm dừng ${files} ở ${count} tab` : `Đã chạy lại ${files} ở ${count} tab`,
+    'ok',
+  );
 }
 
 async function onAddSubmit(event) {

@@ -11,6 +11,9 @@ Extension nhỏ gọn cho phép lưu **một bộ JS + CSS riêng cho từng tab
 - Tự tiêm lại sau mỗi lần tab tải lại (service worker + content script).
 - **Áp dụng** (tiêm vào tab khớp), **Tiêm lại** (mở tab rồi tiêm lại từ đầu, CSS cũ được gỡ trước
   khi chèn lại), **Tải lại** (tải lại trang của tab khớp rồi tiêm lại khi tải xong).
+- **⏸ Dừng / ▶ Chạy**: tạm dừng script đang chạy của bản ghi (gỡ CSS và cho JS tự dọn phần đã thêm
+  vào trang); khi đang tạm dừng, extension không tiêm lại sau mỗi lần tải trang. Bấm **▶ Chạy** để
+  tiêm lại ngay.
 - Thêm / đổi tên / xoá bản ghi ngay trong popup.
 
 ## Cấu trúc
@@ -53,6 +56,8 @@ service worker mới là nơi thực hiện `chrome.scripting.insertCSS` / `exec
 5. **Áp dụng** tiêm vào tab khớp mà không chuyển tab; **Tiêm lại** mở tab và tiêm lại từ đầu;
    **Tải lại** tải lại trang của tab khớp rồi tiêm lại khi tải xong.
 6. Tải lại trang bằng tay: bộ file của bản ghi cũng được tiêm lại tự động.
+7. **⏸ Dừng** để tạm dừng script của bản ghi đang chọn: CSS bị gỡ, JS được gọi hàm dọn dẹp và
+   extension ngừng tự tiêm khi tab tải lại. Nút đổi thành **▶ Chạy** để tiêm lại và chạy tiếp.
 
 ## Thêm file JS/CSS mới
 
@@ -67,6 +72,16 @@ service worker mới là nơi thực hiện `chrome.scripting.insertCSS` / `exec
 
 File JS được chạy ở `world: "MAIN"` nên truy cập được `window` của trang; nên viết theo kiểu
 chạy lại nhiều lần vẫn an toàn (dùng lại phần tử theo `id`, như hai file mẫu).
+
+Để nút **⏸ Dừng** gỡ được phần đã thêm vào trang, mỗi file JS tiêm đăng ký một hàm dọn dẹp:
+
+```js
+const cleanups = (window.__tabInjectorCleanups = window.__tabInjectorCleanups || {});
+// ... phần thêm vào trang ...
+cleanups['ten-file'] = () => {
+  /* gỡ phần đã thêm */
+};
+```
 
 ## Ghi chú
 

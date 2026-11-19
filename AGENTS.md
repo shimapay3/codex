@@ -33,9 +33,13 @@ styling and UI flow only.
   `injected/styles/*.css`, and every new file must be registered in `injected/catalog.json` or it
   will not appear in the popup's selects.
 - Injected JS runs in the page's MAIN world and may execute repeatedly (apply / reload / tab
-  reload), so it must be idempotent — reuse nodes by `id` instead of appending duplicates.
+  reload), so it must be idempotent — reuse nodes by `id` instead of appending duplicates. Every
+  injected script also registers a teardown in `window.__tabInjectorCleanups` under its own key;
+  the service worker's pause path calls and deletes those to undo the script on the page.
 - Records are stored under the `records` key in `chrome.storage.local`; the shape is
-  `{ id, name, tabId, host, jsFile, cssFile, createdAt }`. `settings.matchBy` (`'tab'` | `'host'`,
+  `{ id, name, tabId, host, jsFile, cssFile, paused, createdAt }`. `paused: true` means the record
+  is paused: `injectForTab` skips it, `apply-record` answers `PAUSED`, and `toggle-pause` flips it
+  (pausing removes CSS + runs the cleanups, resuming re-injects). `settings.matchBy` (`'tab'` | `'host'`,
   same storage) decides which key matches a live tab, and both the service worker and the popup
   match through that mode — keep the two implementations in sync when changing matching rules.
 - The popup is 384px wide with `max-height: 600px`; keep it scrollable rather than growing taller.

@@ -8,6 +8,7 @@
 const STORAGE_KEY = 'records';
 const SETTINGS_KEY = 'settings';
 const DEDUPE_MS = 1500;
+const PAUSED_MESSAGE = 'Bản ghi đang tạm dừng — bấm ▶ Chạy để tiêm lại.';
 
 // Chống tiêm hai lần khi một lần tải trang vừa bắn `tabs.onUpdated` vừa bắn
 // `page-ready` từ content script.
@@ -34,6 +35,10 @@ function hostOf(url) {
 
 function isInjectable(url = '') {
   return /^(https?|file):/i.test(url);
+}
+
+function isPaused(record) {
+  return record.paused === true;
 }
 
 function matchesTab(record, tab, matchBy) {
@@ -87,7 +92,48 @@ async function injectInto(tabId, record) {
   return result;
 }
 
+// Tạm dừng: gỡ CSS và gọi hàm dọn dẹp mà JS đã đăng ký trong
+// `window.__tabInjectorCleanups` (mỗi file JS tiêm tự đăng ký một hàm).
+async function removeInjected(tabId, record) {
+  const errors = [];
+
+  if (record.cssFile) {
+    try {
+      await chrome.scripting.removeCSS({ target: { tabId }, files: [record.cssFile] });
+    } catch {
+      // CSS chưa được chèn.
+    }
+  }
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: () => {
+        const cleanups = window.__tabInjectorCleanups;
+        if (!cleanups) return;
+        Object.keys(cleanups).forEach((key) => {
+          try {
+            cleanups[key]();
+          } catch {
+            // Script đã tự dọn trước đó.
+          }
+          delete cleanups[key];
+        });
+      },
+    });
+  } catch (error) {
+    errors.push(`JS: ${error.message}`);
+  }
+
+  return errors;
+}
+
 async function injectRecord(record, matchBy, { activate = false } = {}) {
+  if (isPaused(record)) {
+    return { ok: false, code: 'PAUSED', message: PAUSED_MESSAGE, tabIds: [] };
+  }
+
   const tabs = await tabsForRecord(record, matchBy);
   if (tabs.length === 0) {
     return { ok: false, code: 'NO_TAB', message: noTabMessage(record, matchBy), tabIds: [] };
@@ -129,6 +175,35 @@ async function applyRecord({ recordId, activate }) {
     return { ok: false, code: 'NOT_FOUND', message: 'Không tìm thấy bản ghi.' };
   }
   return injectRecord(record, await getMatchBy(), { activate: Boolean(activate) });
+}
+
+// Bật/tắt chạy bản ghi: tạm dừng thì gỡ CSS + dọn JS khỏi các tab đang khớp,
+// chạy lại thì tiêm ngay như bấm "Áp dụng".
+async function togglePause({ recordId }) {
+  const records = await getRecords();
+  const record = records.find((item) => item.id === recordId);
+  if (!record) {
+    return { ok: false, code: 'NOT_FOUND', message: 'Không tìm thấy bản ghi.' };
+  }
+
+  record.paused = !isPaused(record);
+  await chrome.storage.local.set({ [STORAGE_KEY]: records });
+
+  const matchBy = await getMatchBy();
+  const tabs = await tabsForRecord(record, matchBy);
+  if (tabs.length === 0) {
+    return { ok: false, code: 'NO_TAB', paused: record.paused, message: noTabMessage(record, matchBy), tabIds: [] };
+  }
+
+  if (!record.paused) {
+    return { ...(await injectRecord(record, matchBy)), paused: false };
+  }
+
+  const errors = [];
+  for (const tab of tabs) {
+    errors.push(...(await removeInjected(tab.id, record)));
+  }
+  return { ok: true, paused: true, tabIds: tabs.map((tab) => tab.id), message: errors.join(' · ') };
 }
 
 // Tải lại trang của tab khớp bản ghi; sau khi tải xong content script sẽ được
@@ -177,7 +252,9 @@ async function injectForTab(tabId, { force = false } = {}) {
   if (!tab || !isInjectable(tab.url)) return;
 
   const matchBy = await getMatchBy();
-  const matched = (await getRecords()).filter((record) => matchesTab(record, tab, matchBy));
+  const matched = (await getRecords()).filter(
+    (record) => !isPaused(record) && matchesTab(record, tab, matchBy),
+  );
   if (matched.length === 0) return;
 
   lastInjectedAt.set(tabId, now);
@@ -198,6 +275,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'reload-record') {
     reloadRecord(message)
+      .then(sendResponse)
+      .catch((error) => sendResponse({ ok: false, message: error.message }));
+    return true;
+  }
+
+  if (message.type === 'toggle-pause') {
+    togglePause(message)
       .then(sendResponse)
       .catch((error) => sendResponse({ ok: false, message: error.message }));
     return true;

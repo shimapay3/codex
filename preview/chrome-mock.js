@@ -40,6 +40,7 @@
         host: 'developer.chrome.com',
         jsFile: 'injected/scripts/highlight-links.js',
         cssFile: 'injected/styles/highlight-links.css',
+        paused: false,
         createdAt: Date.now(),
       },
       {
@@ -49,6 +50,7 @@
         host: 'localhost',
         jsFile: 'injected/scripts/hello-badge.js',
         cssFile: 'injected/styles/hello-badge.css',
+        paused: false,
         createdAt: Date.now(),
       },
     ],
@@ -88,6 +90,11 @@
     if (message.type === 'apply-record') {
       const record = store.records.find((item) => item.id === message.recordId);
       if (!record) return { ok: false, code: 'NOT_FOUND', message: 'Không tìm thấy bản ghi.' };
+      if (record.paused) {
+        const text = 'Bản ghi đang tạm dừng — bấm ▶ Chạy để tiêm lại.';
+        log(text, 'error');
+        return { ok: false, code: 'PAUSED', message: text, tabIds: [] };
+      }
 
       const targets = matchedTabs(record);
       if (targets.length === 0) {
@@ -111,6 +118,29 @@
         js: record.jsFile,
         css: record.cssFile,
       };
+    }
+
+    if (message.type === 'toggle-pause') {
+      const record = store.records.find((item) => item.id === message.recordId);
+      if (!record) return { ok: false, code: 'NOT_FOUND', message: 'Không tìm thấy bản ghi.' };
+
+      record.paused = !record.paused;
+
+      const targets = matchedTabs(record);
+      if (targets.length === 0) {
+        const text =
+          matchBy() === 'host'
+            ? `Không có tab nào đang mở ${record.host || 'hostname của bản ghi'}.`
+            : `Tab #${record.tabId} đã đóng. Chuyển sang chế độ Hostname để không phụ thuộc tab id.`;
+        log(text, 'error');
+        return { ok: false, code: 'NO_TAB', paused: record.paused, message: text, tabIds: [] };
+      }
+
+      const files = [record.jsFile, record.cssFile].filter(Boolean).map(base).join(' + ');
+      targets.forEach((tab) => {
+        log(`${record.paused ? 'Tạm dừng' : 'Chạy lại'} #${tab.id} · ${files}`);
+      });
+      return { ok: true, paused: record.paused, tabIds: targets.map((tab) => tab.id) };
     }
 
     if (message.type === 'reload-record') {

@@ -2,6 +2,7 @@
 // Chạy lại nhiều lần vẫn an toàn vì luôn dùng lại đúng một phần tử.
 (() => {
   const ID = 'tab-injector-badge';
+  const cleanups = (window.__tabInjectorCleanups = window.__tabInjectorCleanups || {});
 
   let badge = document.getElementById(ID);
   if (!badge) {
@@ -13,4 +14,7 @@
 
   badge.textContent = 'Tab Injector · ' + new Date().toLocaleTimeString('vi-VN');
   console.log('[Tab Injector] hello-badge.js chạy lúc', new Date().toISOString());
+
+  // Đăng ký hàm dọn dẹp để nút ⏸ Dừng gỡ được huy hiệu khỏi trang.
+  cleanups['hello-badge'] = () => document.getElementById(ID)?.remove();
 })();
