@@ -43,3 +43,6 @@ styling and UI flow only.
   same storage) decides which key matches a live tab, and both the service worker and the popup
   match through that mode — keep the two implementations in sync when changing matching rules.
 - The popup is 384px wide with `max-height: 600px`; keep it scrollable rather than growing taller.
+- Activating a tab (`chrome.tabs.update { active: true }`) closes the popup. Selecting a record row
+  therefore applies with `activate: false`; only the footer "Tiêm lại" button switches tab. Keep
+  row clicks non-activating, otherwise the ⏸ Dừng / ▶ Chạy button can never be reached.

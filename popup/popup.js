@@ -141,7 +141,7 @@ function recordRow(record) {
   row.dataset.id = record.id;
   row.tabIndex = 0;
   row.setAttribute('role', 'button');
-  row.title = paused ? 'Bản ghi đang tạm dừng' : 'Mở tab này và tiêm JS + CSS';
+  row.title = paused ? 'Bản ghi đang tạm dừng' : 'Chọn bản ghi và tiêm JS + CSS vào tab (không chuyển tab)';
 
   const dot = document.createElement('span');
   dot.className = 'dot' + (matches.length > 0 && !paused ? '' : ' is-off');
@@ -271,9 +271,11 @@ async function onListClick(event) {
     return;
   }
 
+  // Chỉ chọn rồi tiêm ngay tại tab khớp — không chuyển/focus tab, vì chuyển tab
+  // sẽ đóng popup và người dùng không kịp bấm ⏸ Dừng.
   state.selectedId = row.dataset.id;
   render();
-  await applySelected(true);
+  await applySelected(false);
 }
 
 function onListKeydown(event) {

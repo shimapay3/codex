@@ -7,7 +7,8 @@ Extension nhỏ gọn cho phép lưu **một bộ JS + CSS riêng cho từng tab
 
 - Mỗi bản ghi lưu: **tên** (người dùng đặt), **tab id**, **hostname**, **file JS**, **file CSS**.
 - Toggle **Nhận diện theo: Tab id / Hostname** — chọn cách extension tìm tab để tiêm.
-- Click vào một bản ghi trong danh sách → extension mở đúng tab đó và tiêm JS + CSS đã lưu.
+- Click vào một bản ghi trong danh sách → chọn bản ghi và tiêm JS + CSS vào tab khớp, **không chuyển
+  tab** nên popup vẫn mở để bấm ⏸ Dừng / ▶ Chạy.
 - Tự tiêm lại sau mỗi lần tab tải lại (service worker + content script).
 - **Áp dụng** (tiêm vào tab khớp), **Tiêm lại** (mở tab rồi tiêm lại từ đầu, CSS cũ được gỡ trước
   khi chèn lại), **Tải lại** (tải lại trang của tab khớp rồi tiêm lại khi tải xong).
@@ -52,7 +53,8 @@ service worker mới là nơi thực hiện `chrome.scripting.insertCSS` / `exec
 3. Ở mục **Thêm bản ghi**: nhập tên, chọn tab, chọn file JS và file CSS → **Thêm bản ghi**.
    Bản ghi luôn lưu cả tab id và hostname, nên đổi chế độ được bất cứ lúc nào.
    (Mỗi khoá chỉ có một bản ghi; thêm lại cho cùng tab/hostname sẽ cập nhật bản ghi cũ.)
-4. Click vào bản ghi trong danh sách: extension chuyển sang đúng tab và tiêm JS + CSS.
+4. Click vào bản ghi trong danh sách: bản ghi được chọn và JS + CSS được tiêm vào tab khớp mà
+   **không chuyển tab** (popup vẫn mở). Muốn mở hẳn tab đó thì dùng **Tiêm lại**.
 5. **Áp dụng** tiêm vào tab khớp mà không chuyển tab; **Tiêm lại** mở tab và tiêm lại từ đầu;
    **Tải lại** tải lại trang của tab khớp rồi tiêm lại khi tải xong.
 6. Tải lại trang bằng tay: bộ file của bản ghi cũng được tiêm lại tự động.
