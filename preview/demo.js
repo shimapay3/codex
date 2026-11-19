@@ -6,13 +6,18 @@ const LOG_LIMIT = 6;
 const frame = document.getElementById('popup-frame');
 const logList = document.getElementById('demo-log');
 
+// Trình quét trước của Chrome tải các URL tương đối trong srcdoc theo địa chỉ
+// trang cha (bỏ qua <base>), nên đổi hết sang đường dẫn tuyệt đối để không có
+// request 404 nào bị bắn ra.
+const ABSOLUTE_ATTR = /(href|src)="(?!\/|https?:|data:|blob:|#|mailto:)([^"]+)"/g;
+const absolutize = (html) => html.replace(ABSOLUTE_ATTR, (_, attr, url) => `${attr}="/popup/${url}"`);
+
 async function mountPopup() {
   try {
     const response = await fetch(POPUP_PATH);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
+    const html = absolutize(await response.text());
 
-    // <base> để các đường dẫn tương đối (popup.css, popup.js) trỏ về /popup/.
     const injected = '<base href="/popup/">\n<script src="/preview/chrome-mock.js"><\/script>';
     frame.srcdoc = html.replace('<head>', `<head>\n${injected}`);
   } catch (error) {
