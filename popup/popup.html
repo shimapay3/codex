@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tab Injector</title>
+    <link rel="stylesheet" href="popup.css" />
+    <script src="popup.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">{ }</span>
+        <div>
+          <h1>Tab Injector</h1>
+          <p>Tiêm JS &amp; CSS riêng cho từng tab</p>
+        </div>
+      </div>
+      <button id="btn-refresh" class="icon-btn" type="button" title="Tải lại danh sách tab">⟳</button>
+    </header>
+
+    <main>
+      <section class="block">
+        <div class="block-head">
+          <h2>Bản ghi</h2>
+          <span id="record-count" class="pill">0</span>
+        </div>
+        <ul id="record-list" class="record-list"></ul>
+        <p id="empty-state" class="empty">Chưa có bản ghi nào. Thêm bản ghi đầu tiên ở bên dưới.</p>
+      </section>
+
+      <section class="block">
+        <div class="block-head">
+          <h2>Thêm bản ghi</h2>
+        </div>
+        <form id="add-form" class="add-form" autocomplete="off">
+          <label>
+            Tên bản ghi
+            <input id="new-name" type="text" maxlength="60" placeholder="VD: Kiểm thử giao diện" required />
+          </label>
+          <label>
+            Tab
+            <select id="new-tab" required></select>
+          </label>
+          <div class="row2">
+            <label>
+              File JS
+              <select id="new-js"></select>
+            </label>
+            <label>
+              File CSS
+              <select id="new-css"></select>
+            </label>
+          </div>
+          <button class="btn primary" type="submit">Thêm bản ghi</button>
+        </form>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="selected">
+        <span class="label">Đang chọn</span>
+        <strong id="selected-name">—</strong>
+      </div>
+      <div class="actions">
+        <button id="btn-apply" class="btn" type="button" disabled>Áp dụng</button>
+        <button id="btn-reload" class="btn primary" type="button" disabled>Tiêm lại</button>
+      </div>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

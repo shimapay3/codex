@@ -1,0 +1,10 @@
+{
+  "scripts": [
+    { "file": "injected/scripts/hello-badge.js", "label": "hello-badge.js — huy hiệu thời gian" },
+    { "file": "injected/scripts/highlight-links.js", "label": "highlight-links.js — tô sáng liên kết" }
+  ],
+  "styles": [
+    { "file": "injected/styles/hello-badge.css", "label": "hello-badge.css — style huy hiệu" },
+    { "file": "injected/styles/highlight-links.css", "label": "highlight-links.css — style liên kết" }
+  ]
+}

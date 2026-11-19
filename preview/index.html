@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tab Injector — Chrome extension (Manifest V3)</title>
+    <link rel="stylesheet" href="/preview/demo.css" />
+    <script src="/preview/demo.js" defer></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <span class="hero-mark">{ }</span>
+        <div class="hero-text">
+          <h1>Tab Injector</h1>
+          <p>
+            Chrome extension Manifest V3 — lưu một bộ JS + CSS riêng cho từng tab id và tự tiêm lại
+            sau mỗi lần tải trang.
+          </p>
+        </div>
+        <span class="tag">Manifest V3</span>
+      </header>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Cài đặt (load unpacked)</h2>
+          <ol class="steps">
+            <li>Mở <code>chrome://extensions</code> trong Chrome.</li>
+            <li>Bật <strong>Developer mode</strong> ở góc trên bên phải.</li>
+            <li>
+              Bấm <strong>Load unpacked</strong> và chọn thư mục gốc của repo (thư mục chứa
+              <code>manifest.json</code>).
+            </li>
+            <li>Ghim extension lên thanh công cụ rồi mở popup.</li>
+          </ol>
+
+          <h2>Cách dùng</h2>
+          <ul class="bullets">
+            <li>Thêm bản ghi: đặt tên, chọn tab đang mở, chọn file JS và file CSS.</li>
+            <li>Click vào một bản ghi: extension mở đúng tab đó và tiêm JS + CSS đã lưu.</li>
+            <li>
+              <strong>Áp dụng</strong> tiêm vào tab đang chọn; <strong>Tiêm lại</strong> mở tab và
+              tiêm lại từ đầu.
+            </li>
+            <li>Mỗi lần tab tải lại, bộ file của bản ghi được tiêm lại tự động.</li>
+          </ul>
+
+          <p class="note">
+            Tab id đổi khi khởi động lại Chrome — khi đó bản ghi hiện “tab đã đóng”, chỉ cần lưu lại
+            cho tab mới.
+          </p>
+        </section>
+
+        <section class="card demo">
+          <div class="demo-head">
+            <h2>Xem trước popup</h2>
+            <span class="demo-badge">dữ liệu mô phỏng</span>
+          </div>
+
+          <div class="frame-wrap">
+            <iframe id="popup-frame" title="Bản xem trước popup Tab Injector"></iframe>
+          </div>
+
+          <div class="log">
+            <div class="log-head">Nhật ký tiêm (mô phỏng)</div>
+            <ul id="demo-log" class="log-list">
+              <li class="log-empty">Chưa có thao tác nào.</li>
+            </ul>
+          </div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>

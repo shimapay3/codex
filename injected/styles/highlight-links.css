@@ -1,0 +1,6 @@
+/* CSS mẫu: tô sáng các liên kết do highlight-links.js đánh dấu. */
+a.tab-injector-link {
+  outline: 2px dashed #f59e0b !important;
+  outline-offset: 2px;
+  background-color: rgba(245, 158, 11, 0.12) !important;
+}

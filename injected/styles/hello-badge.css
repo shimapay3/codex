@@ -1,0 +1,14 @@
+/* CSS mẫu: tạo hình cho huy hiệu do hello-badge.js gắn vào trang. */
+#tab-injector-badge.tab-injector-badge {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483647;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #4f46e5;
+  color: #ffffff;
+  font: 600 13px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
+  pointer-events: none;
+}
