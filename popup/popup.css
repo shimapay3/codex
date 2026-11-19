@@ -23,7 +23,9 @@ body {
 
 body {
   width: 384px;
+  max-width: 100%;
   max-height: 600px;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -93,6 +95,55 @@ h1 {
   color: var(--accent);
   border-color: #d5d2fb;
   background: var(--accent-soft);
+}
+
+/* ---------- Mode bar ---------- */
+.mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.mode-label {
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+
+.mode-btn {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mode-btn:hover {
+  color: var(--accent);
+}
+
+.mode-btn.is-active {
+  background: var(--accent);
+  color: #fff;
 }
 
 /* ---------- Layout ---------- */
@@ -382,9 +433,9 @@ h2 {
 /* ---------- Footer ---------- */
 .footer {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   padding: 10px 16px 12px;
   border-top: 1px solid var(--line);
   background: var(--surface);
@@ -405,7 +456,6 @@ h2 {
 
 .selected strong {
   display: block;
-  max-width: 160px;
   font-size: 12.5px;
   white-space: nowrap;
   overflow: hidden;
@@ -413,9 +463,14 @@ h2 {
 }
 
 .actions {
-  display: flex;
-  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
+}
+
+.actions .btn {
+  padding: 7px 6px;
+  white-space: nowrap;
 }
 
 /* ---------- Toast ---------- */

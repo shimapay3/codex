@@ -5,11 +5,12 @@ Extension nhỏ gọn cho phép lưu **một bộ JS + CSS riêng cho từng tab
 
 ## Tính năng
 
-- Mỗi bản ghi lưu: **tên** (người dùng đặt), **tab id**, **file JS**, **file CSS**.
+- Mỗi bản ghi lưu: **tên** (người dùng đặt), **tab id**, **hostname**, **file JS**, **file CSS**.
+- Toggle **Nhận diện theo: Tab id / Hostname** — chọn cách extension tìm tab để tiêm.
 - Click vào một bản ghi trong danh sách → extension mở đúng tab đó và tiêm JS + CSS đã lưu.
 - Tự tiêm lại sau mỗi lần tab tải lại (service worker + content script).
-- Nút **Áp dụng** (tiêm vào tab đang chọn) và **Tiêm lại** (mở tab rồi tiêm lại từ đầu, CSS cũ
-  được gỡ trước khi chèn lại).
+- **Áp dụng** (tiêm vào tab khớp), **Tiêm lại** (mở tab rồi tiêm lại từ đầu, CSS cũ được gỡ trước
+  khi chèn lại), **Tải lại** (tải lại trang của tab khớp rồi tiêm lại khi tải xong).
 - Thêm / đổi tên / xoá bản ghi ngay trong popup.
 
 ## Cấu trúc
@@ -41,11 +42,17 @@ service worker mới là nơi thực hiện `chrome.scripting.insertCSS` / `exec
 ## Sử dụng
 
 1. Mở tab bạn muốn tiêm, rồi mở popup.
-2. Ở mục **Thêm bản ghi**: nhập tên, chọn tab, chọn file JS và file CSS → **Thêm bản ghi**.
-   (Mỗi tab chỉ có một bản ghi; thêm lại cho cùng tab sẽ cập nhật bản ghi cũ.)
-3. Click vào bản ghi trong danh sách: extension chuyển sang đúng tab và tiêm JS + CSS.
-4. **Áp dụng** tiêm vào tab đang chọn mà không chuyển tab; **Tiêm lại** mở tab và tiêm lại từ đầu.
-5. Tải lại trang: bộ file của bản ghi được tiêm lại tự động.
+2. Chọn chế độ ở thanh **Nhận diện theo**:
+   - **Tab id**: chỉ tiêm vào đúng tab đã lưu (tab đóng thì bản ghi báo “tab đã đóng”).
+   - **Hostname**: tiêm vào mọi tab đang mở cùng hostname — không phụ thuộc tab id, tab đóng hay
+     Chrome khởi động lại.
+3. Ở mục **Thêm bản ghi**: nhập tên, chọn tab, chọn file JS và file CSS → **Thêm bản ghi**.
+   Bản ghi luôn lưu cả tab id và hostname, nên đổi chế độ được bất cứ lúc nào.
+   (Mỗi khoá chỉ có một bản ghi; thêm lại cho cùng tab/hostname sẽ cập nhật bản ghi cũ.)
+4. Click vào bản ghi trong danh sách: extension chuyển sang đúng tab và tiêm JS + CSS.
+5. **Áp dụng** tiêm vào tab khớp mà không chuyển tab; **Tiêm lại** mở tab và tiêm lại từ đầu;
+   **Tải lại** tải lại trang của tab khớp rồi tiêm lại khi tải xong.
+6. Tải lại trang bằng tay: bộ file của bản ghi cũng được tiêm lại tự động.
 
 ## Thêm file JS/CSS mới
 
@@ -64,8 +71,10 @@ chạy lại nhiều lần vẫn an toàn (dùng lại phần tử theo `id`, nh
 ## Ghi chú
 
 - Không tiêm được vào `chrome://*`, Chrome Web Store và trang nội bộ của extension — popup sẽ báo lỗi.
-- Tab id thay đổi sau khi khởi động lại Chrome. Bản ghi khi đó hiển thị “tab đã đóng”; chỉ cần thêm
-  lại bản ghi cho tab mới.
+- Tab id thay đổi sau khi khởi động lại Chrome. Bật chế độ **Hostname** để bản ghi tiếp tục khớp mà
+  không cần lưu lại; ở chế độ **Tab id**, bản ghi hiển thị “tab đã đóng”.
+- Ở chế độ Hostname, mọi tab đang mở cùng hostname đều được tiêm (so khớp chính xác hostname, không
+  gộp `www.`).
 - Dữ liệu lưu trong `chrome.storage.local`.
 
 ## Xem trước giao diện (không cần cài extension)

@@ -35,5 +35,7 @@ styling and UI flow only.
 - Injected JS runs in the page's MAIN world and may execute repeatedly (apply / reload / tab
   reload), so it must be idempotent — reuse nodes by `id` instead of appending duplicates.
 - Records are stored under the `records` key in `chrome.storage.local`; the shape is
-  `{ id, name, tabId, jsFile, cssFile, createdAt }` and one record exists per tab id.
+  `{ id, name, tabId, host, jsFile, cssFile, createdAt }`. `settings.matchBy` (`'tab'` | `'host'`,
+  same storage) decides which key matches a live tab, and both the service worker and the popup
+  match through that mode — keep the two implementations in sync when changing matching rules.
 - The popup is 384px wide with `max-height: 600px`; keep it scrollable rather than growing taller.

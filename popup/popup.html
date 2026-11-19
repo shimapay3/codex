@@ -18,6 +18,14 @@
       <button id="btn-refresh" class="icon-btn" type="button" title="Tải lại danh sách tab">⟳</button>
     </header>
 
+    <div class="mode-bar">
+      <span class="mode-label">Nhận diện theo</span>
+      <div id="mode-toggle" class="mode-toggle" role="group" aria-label="Kiểu nhận diện tab">
+        <button class="mode-btn is-active" type="button" data-mode="tab" aria-pressed="true">Tab id</button>
+        <button class="mode-btn" type="button" data-mode="host" aria-pressed="false">Hostname</button>
+      </div>
+    </div>
+
     <main>
       <section class="block">
         <div class="block-head">
@@ -62,8 +70,9 @@
         <strong id="selected-name">—</strong>
       </div>
       <div class="actions">
-        <button id="btn-apply" class="btn" type="button" disabled>Áp dụng</button>
-        <button id="btn-reload" class="btn primary" type="button" disabled>Tiêm lại</button>
+        <button id="btn-apply" class="btn" type="button" disabled title="Tiêm JS + CSS vào tab khớp bản ghi">Áp dụng</button>
+        <button id="btn-reload" class="btn primary" type="button" disabled title="Mở tab và tiêm lại từ đầu">Tiêm lại</button>
+        <button id="btn-page-reload" class="btn" type="button" disabled title="Tải lại trang rồi tiêm lại">Tải lại</button>
       </div>
     </footer>
 

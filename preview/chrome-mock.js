@@ -31,11 +31,13 @@
   ];
 
   const store = {
+    settings: { matchBy: 'tab' },
     records: [
       {
         id: 'demo-record-1',
         name: 'Tô sáng liên kết',
         tabId: 813,
+        host: 'developer.chrome.com',
         jsFile: 'injected/scripts/highlight-links.js',
         cssFile: 'injected/styles/highlight-links.css',
         createdAt: Date.now(),
@@ -44,6 +46,7 @@
         id: 'demo-record-2',
         name: 'Huy hiệu thời gian',
         tabId: 814,
+        host: 'localhost',
         jsFile: 'injected/scripts/hello-badge.js',
         cssFile: 'injected/styles/hello-badge.css',
         createdAt: Date.now(),
@@ -55,6 +58,21 @@
   const base = (path) => (path ? path.split('/').pop() : '');
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  const hostOf = (url) => {
+    try {
+      return new URL(url).hostname.toLowerCase();
+    } catch {
+      return '';
+    }
+  };
+
+  const matchBy = () => (store.settings && store.settings.matchBy === 'host' ? 'host' : 'tab');
+
+  const matchedTabs = (record) => {
+    const mode = matchBy();
+    return tabs.filter((tab) => (mode === 'host' ? hostOf(tab.url) === record.host : tab.id === record.tabId));
+  };
+
   const log = (text, kind = 'inject') => {
     try {
       parent.postMessage({ source: 'tab-injector-demo', text, kind }, '*');
@@ -65,27 +83,60 @@
 
   async function sendMessage(message) {
     await delay(140);
-    if (!message || message.type !== 'apply-record') return undefined;
+    if (!message) return undefined;
 
-    const record = store.records.find((item) => item.id === message.recordId);
-    if (!record) return { ok: false, code: 'NOT_FOUND', message: 'Không tìm thấy bản ghi.' };
+    if (message.type === 'apply-record') {
+      const record = store.records.find((item) => item.id === message.recordId);
+      if (!record) return { ok: false, code: 'NOT_FOUND', message: 'Không tìm thấy bản ghi.' };
 
-    const tab = tabs.find((item) => item.id === record.tabId);
-    if (!tab) {
-      log(`Tab #${record.tabId} đã đóng — không thể tiêm.`, 'error');
+      const targets = matchedTabs(record);
+      if (targets.length === 0) {
+        const text =
+          matchBy() === 'host'
+            ? `Không có tab nào đang mở ${record.host || 'hostname của bản ghi'}.`
+            : `Tab #${record.tabId} đã đóng. Chuyển sang chế độ Hostname để không phụ thuộc tab id.`;
+        log(text, 'error');
+        return { ok: false, code: 'NO_TAB', message: text, tabIds: [] };
+      }
+
+      if (message.activate) tabs.forEach((item) => (item.active = item.id === targets[0].id));
+
+      const files = [record.jsFile, record.cssFile].filter(Boolean).map(base).join(' + ');
+      targets.forEach((tab) => {
+        log(`${message.activate ? 'Mở tab' : 'Tiêm vào'} #${tab.id} · ${files}`);
+      });
       return {
-        ok: false,
-        code: 'TAB_GONE',
-        message: `Tab #${record.tabId} đã đóng. Mở lại tab rồi lưu bản ghi mới.`,
+        ok: true,
+        tabIds: targets.map((tab) => tab.id),
+        js: record.jsFile,
+        css: record.cssFile,
       };
     }
 
-    if (message.activate) tabs.forEach((item) => (item.active = item.id === tab.id));
+    if (message.type === 'reload-record') {
+      const record = store.records.find((item) => item.id === message.recordId);
+      if (!record) return { ok: false, code: 'NOT_FOUND', message: 'Không tìm thấy bản ghi.' };
 
-    const files = [record.jsFile, record.cssFile].filter(Boolean).map(base).join(' + ');
-    log(`${message.activate ? 'Mở tab' : 'Tiêm vào'} #${tab.id} · ${files}`);
+      const targets = matchedTabs(record);
+      if (targets.length === 0) {
+        const text =
+          matchBy() === 'host'
+            ? `Không có tab nào đang mở ${record.host || 'hostname của bản ghi'}.`
+            : `Tab #${record.tabId} đã đóng. Chuyển sang chế độ Hostname để không phụ thuộc tab id.`;
+        log(text, 'error');
+        return { ok: false, code: 'NO_TAB', message: text, tabIds: [] };
+      }
 
-    return { ok: true, tabId: tab.id, js: record.jsFile, css: record.cssFile, errors: [] };
+      targets.forEach((tab) => log(`Tải lại #${tab.id} · sẽ tiêm lại khi tải xong`));
+      const files = [record.jsFile, record.cssFile].filter(Boolean).map(base).join(' + ');
+      setTimeout(() => {
+        targets.forEach((tab) => log(`Tiêm lại #${tab.id} · ${files}`));
+      }, 700);
+
+      return { ok: true, tabIds: targets.map((tab) => tab.id) };
+    }
+
+    return undefined;
   }
 
   window.chrome = {
@@ -119,6 +170,9 @@
         if (!tab) throw new Error(`No tab with id: ${tabId}`);
         Object.assign(tab, props);
         return clone(tab);
+      },
+      async reload() {
+        return undefined;
       },
     },
     windows: {

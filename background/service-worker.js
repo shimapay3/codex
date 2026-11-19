@@ -1,7 +1,12 @@
 // Service worker: giữ danh sách bản ghi trong chrome.storage.local và thực hiện
-// việc tiêm JS/CSS vào đúng tab id, kể cả sau khi trang được tải lại.
+// việc tiêm JS/CSS vào đúng tab, kể cả sau khi trang được tải lại.
+//
+// Bản ghi được nhận diện theo `settings.matchBy`:
+//  - 'tab'  : đúng tab id đã lưu
+//  - 'host' : mọi tab đang mở cùng hostname (tab id đổi hay tab bị đóng vẫn tiêm được)
 
 const STORAGE_KEY = 'records';
+const SETTINGS_KEY = 'settings';
 const DEDUPE_MS = 1500;
 
 // Chống tiêm hai lần khi một lần tải trang vừa bắn `tabs.onUpdated` vừa bắn
@@ -13,17 +18,39 @@ async function getRecords() {
   return Array.isArray(data[STORAGE_KEY]) ? data[STORAGE_KEY] : [];
 }
 
-function findRecordForTab(records, tabId) {
-  return records.find((record) => record.tabId === tabId) || null;
+async function getMatchBy() {
+  const data = await chrome.storage.local.get(SETTINGS_KEY);
+  const settings = data[SETTINGS_KEY];
+  return settings && settings.matchBy === 'host' ? 'host' : 'tab';
 }
 
-async function tabExists(tabId) {
+function hostOf(url) {
   try {
-    const tab = await chrome.tabs.get(tabId);
-    return Boolean(tab);
+    return new URL(url).hostname.toLowerCase();
   } catch {
-    return false;
+    return '';
   }
+}
+
+function isInjectable(url = '') {
+  return /^(https?|file):/i.test(url);
+}
+
+function matchesTab(record, tab, matchBy) {
+  if (!tab || tab.id == null) return false;
+  if (matchBy === 'host') return Boolean(record.host) && hostOf(tab.url) === record.host;
+  return record.tabId === tab.id;
+}
+
+async function tabsForRecord(record, matchBy) {
+  const tabs = await chrome.tabs.query({});
+  return tabs.filter((tab) => tab.id != null && isInjectable(tab.url) && matchesTab(record, tab, matchBy));
+}
+
+function noTabMessage(record, matchBy) {
+  return matchBy === 'host'
+    ? `Không có tab nào đang mở ${record.host || 'hostname của bản ghi'}.`
+    : `Tab #${record.tabId} đã đóng. Chuyển sang chế độ Hostname để không phụ thuộc tab id.`;
 }
 
 // Bỏ CSS cũ trước khi chèn lại để bấm "Tiêm lại" không chồng nhiều bản.
@@ -60,25 +87,39 @@ async function injectInto(tabId, record) {
   return result;
 }
 
-async function injectRecord(record) {
-  if (!(await tabExists(record.tabId))) {
-    return {
-      ok: false,
-      code: 'TAB_GONE',
-      message: `Tab #${record.tabId} đã đóng. Mở lại tab rồi lưu bản ghi mới.`,
-    };
+async function injectRecord(record, matchBy, { activate = false } = {}) {
+  const tabs = await tabsForRecord(record, matchBy);
+  if (tabs.length === 0) {
+    return { ok: false, code: 'NO_TAB', message: noTabMessage(record, matchBy), tabIds: [] };
   }
 
-  const result = await injectInto(record.tabId, record);
-  if (result.errors.length > 0) {
-    return {
-      ok: false,
-      code: 'INJECT_FAILED',
-      message: result.errors.join(' · '),
-      ...result,
-    };
+  if (activate) {
+    const [first] = tabs;
+    await chrome.tabs.update(first.id, { active: true });
+    if (first.windowId != null) {
+      await chrome.windows.update(first.windowId, { focused: true });
+    }
   }
-  return { ok: true, ...result };
+
+  const tabIds = [];
+  const errors = [];
+  for (const tab of tabs) {
+    const result = await injectInto(tab.id, record);
+    if (result.errors.length > 0) errors.push(...result.errors);
+    else tabIds.push(tab.id);
+  }
+
+  if (tabIds.length === 0) {
+    return { ok: false, code: 'INJECT_FAILED', message: errors.join(' · '), tabIds: [] };
+  }
+
+  return {
+    ok: true,
+    tabIds,
+    js: record.jsFile,
+    css: record.cssFile,
+    message: errors.join(' · '),
+  };
 }
 
 async function applyRecord({ recordId, activate }) {
@@ -87,36 +128,62 @@ async function applyRecord({ recordId, activate }) {
   if (!record) {
     return { ok: false, code: 'NOT_FOUND', message: 'Không tìm thấy bản ghi.' };
   }
+  return injectRecord(record, await getMatchBy(), { activate: Boolean(activate) });
+}
 
-  if (activate) {
+// Tải lại trang của tab khớp bản ghi; sau khi tải xong content script sẽ được
+// tiêm lại tự động. Tab được tìm tại thời điểm bấm nên không phụ thuộc tab id cũ.
+async function reloadRecord({ recordId }) {
+  const records = await getRecords();
+  const record = records.find((item) => item.id === recordId);
+  if (!record) {
+    return { ok: false, code: 'NOT_FOUND', message: 'Không tìm thấy bản ghi.' };
+  }
+
+  const matchBy = await getMatchBy();
+  const tabs = await tabsForRecord(record, matchBy);
+  if (tabs.length === 0) {
+    return { ok: false, code: 'NO_TAB', message: noTabMessage(record, matchBy), tabIds: [] };
+  }
+
+  const tabIds = [];
+  for (const tab of tabs) {
     try {
-      const tab = await chrome.tabs.update(record.tabId, { active: true });
-      if (tab && tab.windowId != null) {
-        await chrome.windows.update(tab.windowId, { focused: true });
-      }
+      await chrome.tabs.reload(tab.id);
+      tabIds.push(tab.id);
     } catch {
-      return {
-        ok: false,
-        code: 'TAB_GONE',
-        message: `Tab #${record.tabId} đã đóng. Mở lại tab rồi lưu bản ghi mới.`,
-      };
+      // Tab vừa đóng giữa lúc tải lại — bỏ qua.
     }
   }
 
-  return injectRecord(record);
+  if (tabIds.length === 0) {
+    return { ok: false, code: 'RELOAD_FAILED', message: 'Không tải lại được tab nào.', tabIds: [] };
+  }
+  return { ok: true, tabIds };
 }
 
-// Tự tiêm lại sau mỗi lần trang tải lại (tab id giữ nguyên khi reload).
+// Tự tiêm lại sau mỗi lần trang tải lại.
 async function injectForTab(tabId, { force = false } = {}) {
   const now = Date.now();
   const previous = lastInjectedAt.get(tabId) || 0;
   if (!force && now - previous < DEDUPE_MS) return;
 
-  const record = findRecordForTab(await getRecords(), tabId);
-  if (!record) return;
+  let tab;
+  try {
+    tab = await chrome.tabs.get(tabId);
+  } catch {
+    return;
+  }
+  if (!tab || !isInjectable(tab.url)) return;
+
+  const matchBy = await getMatchBy();
+  const matched = (await getRecords()).filter((record) => matchesTab(record, tab, matchBy));
+  if (matched.length === 0) return;
 
   lastInjectedAt.set(tabId, now);
-  await injectInto(tabId, record);
+  for (const record of matched) {
+    await injectInto(tabId, record);
+  }
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -124,6 +191,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'apply-record') {
     applyRecord(message)
+      .then(sendResponse)
+      .catch((error) => sendResponse({ ok: false, message: error.message }));
+    return true;
+  }
+
+  if (message.type === 'reload-record') {
+    reloadRecord(message)
       .then(sendResponse)
       .catch((error) => sendResponse({ ok: false, message: error.message }));
     return true;
